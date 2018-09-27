@@ -1,0 +1,140 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>fr.cirad</groupId>
+  <artifactId>Mgdb2BrapiImpl</artifactId>
+  <version>1.1-RELEASE</version>
+  <packaging>jar</packaging> 
+  
+  <dependencies>
+        <dependency>
+		    <groupId>fr.cirad</groupId>
+		    <artifactId>mgdb2</artifactId>
+		    <version>2.0-alpha</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>com.fasterxml.jackson.core</groupId>
+                    <artifactId>jackson-annotations</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+
+		<dependency>
+		   <groupId>org.apache.commons</groupId>
+		   <artifactId>commons-text</artifactId>
+		   <version>1.4</version>
+		</dependency>
+
+		<dependency>
+			<groupId>fr.cirad</groupId>
+			<artifactId>role_manager</artifactId>
+			<version>1.0-alpha</version>
+		</dependency>
+
+        <dependency>
+            <groupId>javax.servlet</groupId>
+            <artifactId>jstl</artifactId>
+            <version>1.1.2</version>
+        </dependency>
+
+        <dependency>
+            <groupId>taglibs</groupId>
+            <artifactId>standard</artifactId>
+            <version>1.1.2</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework</groupId>
+            <artifactId>spring-webmvc</artifactId>
+            <version>4.3.9.RELEASE</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>commons-logging</groupId>
+                    <artifactId>commons-logging</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+            <version>2.9.0</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>com.fasterxml.jackson.core</groupId>
+                    <artifactId>jackson-annotations</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-annotations</artifactId>
+            <version>2.9.0</version>
+        </dependency>
+<!--         <dependency> -->
+<!--             <groupId>com.github.samtools</groupId> -->
+<!--             <artifactId>htsjdk</artifactId> -->
+<!--             <version>2.14.1</version> -->
+<!--             <exclusions> -->
+<!--                 <exclusion> -->
+<!--                     <groupId>org.apache.commons</groupId> -->
+<!--                     <artifactId>commons-compress</artifactId> -->
+<!--                 </exclusion> -->
+<!--                 <exclusion> -->
+<!--                     <groupId>org.xerial.snappy</groupId> -->
+<!--                     <artifactId>snappy-java</artifactId> -->
+<!--                 </exclusion> -->
+<!--             </exclusions> -->
+<!--         </dependency> -->
+        
+        <dependency>
+            <groupId>io.springfox</groupId>
+            <artifactId>springfox-swagger2</artifactId>
+            <version>2.7.0</version>
+            <exclusions>
+                <exclusion>
+                    <groupId>org.slf4j</groupId>
+                    <artifactId>slf4j-api</artifactId>
+                </exclusion>
+                <exclusion>
+                    <groupId>org.springframework</groupId>
+                    <artifactId>spring-aop</artifactId>
+                </exclusion>
+            </exclusions>
+        </dependency>
+        <dependency>
+            <groupId>io.springfox</groupId>
+            <artifactId>springfox-swagger-ui</artifactId>
+            <version>2.5.0</version>
+        </dependency>
+  </dependencies>
+  
+  <repositories>
+	  <repository>
+	    <id>spring-milestones</id>
+	    <url>http://repo.spring.io/libs-milestone/</url>
+	  </repository>
+  </repositories>
+  
+  <build>
+    <sourceDirectory>src</sourceDirectory>
+    <plugins>
+      <plugin>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <version>3.5.1</version>
+        <configuration>
+          <source>1.8</source>
+          <target>1.8</target>
+        </configuration>
+      </plugin>
+<!--       <plugin> -->
+<!--         <artifactId>maven-war-plugin</artifactId> -->
+<!--         <version>3.0.0</version> -->
+<!--         <configuration> -->
+<!--           <warSourceDirectory>WebContent</warSourceDirectory> -->
+<!--           <failOnMissingWebXml>false</failOnMissingWebXml> -->
+<!--         </configuration> -->
+<!--       </plugin> -->
+    </plugins>
+  </build>
+</project>
