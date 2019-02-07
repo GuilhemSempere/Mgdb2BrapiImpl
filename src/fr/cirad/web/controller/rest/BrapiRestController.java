@@ -1031,8 +1031,8 @@ public class BrapiRestController implements ServletContextAware {
 					ProgressIndicator progress = new ProgressIndicator(extractId, new String[] {"Generating export file"});
 					ProgressIndicator.registerProgressIndicator(progress);
 					
-					int avgObjSize = (Integer) mongoTemplate.getCollection(mongoTemplate.getCollectionName(VariantRunData.class)).getStats().get("avgObjSize");
-			        int nChunkIndex = 0, nChunkSize = IExportHandler.nMaxChunkSizeInMb * 1024 * 1024 / avgObjSize;
+			    	Number avgObjSize = (Number) mongoTemplate.getCollection(mongoTemplate.getCollectionName(VariantRunData.class)).getStats().get("avgObjSize");
+			        int nChunkIndex = 0, nChunkSize = (int) (IExportHandler.nMaxChunkSizeInMb * 1024 * 1024 / avgObjSize.doubleValue());
 			        
 					FileWriter fw = null;
 					try
