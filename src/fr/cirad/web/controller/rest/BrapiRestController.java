@@ -1207,19 +1207,19 @@ public class BrapiRestController implements ServletContextAware {
 		        Enumeration<NetworkInterface> niEnum = NetworkInterface.getNetworkInterfaces();
 		        mainLoop : for (; niEnum.hasMoreElements();)
 		        {
-		                NetworkInterface ni = niEnum.nextElement();
-		                Enumeration<InetAddress> a = ni.getInetAddresses();
-		                for (; a.hasMoreElements();)
-		                {
-	                        InetAddress addr = a.nextElement();
-	                        String hostAddress = addr.getHostAddress();
-	                        if (!"127.0.1.1".equals(hostAddress) && hostAddress.split("\\.").length >= 4)
-	                        {
-	                        	sHostName = hostAddress;
-	                        	if (!ni.getDisplayName().toLowerCase().startsWith("wlan"))
-	                        		break mainLoop;	// otherwise we will keep searching in case we find an ethernet network
-	                        }
-		                }
+	                NetworkInterface ni = niEnum.nextElement();
+	                Enumeration<InetAddress> a = ni.getInetAddresses();
+	                for (; a.hasMoreElements();)
+	                {
+                        InetAddress addr = a.nextElement();
+                        String hostAddress = addr.getHostAddress().replaceAll("/", "");
+                        if (!hostAddress.startsWith("127.0.") && hostAddress.split("\\.").length >= 4)
+                        {
+                        	sHostName = hostAddress;
+                        	if (!addr.isSiteLocalAddress() && !ni.getDisplayName().toLowerCase().startsWith("wlan"))
+                        		break mainLoop;	// otherwise we will keep searching in case we find an ethernet network
+                        }
+	                }
 		        }
 		        if (sHostName == null)
 		        	LOG.error("Unable to convert local address to internet IP");
