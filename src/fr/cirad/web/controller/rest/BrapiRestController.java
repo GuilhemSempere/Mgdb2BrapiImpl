@@ -97,6 +97,7 @@ import io.swagger.annotations.ApiOperation;
 import jhi.brapi.api.Metadata;
 import jhi.brapi.api.Pagination;
 import jhi.brapi.api.Status;
+import jhi.brapi.api.germplasm.BrapiGermplasm;
 
 /**
  *
@@ -149,8 +150,6 @@ public class BrapiRestController implements ServletContextAware {
 	static public final String URL_MAP_POSITIONS_V1_0 = URL_MAPS + "/{id}/positions";
     static public final String URL_MARKERS_SEARCH_V1_0 = "markers";
     
-    static public final HashMap<String, String> germplasmFields = new HashMap<>();
-
     static private final TreeSet<Map<String, Object>> implementedCalls = new TreeSet<>();
     protected HashMap<String /*module*/, HashMap<Integer /*marker index when sorted by id*/, Comparable /*marker id*/>> markerIndexByModuleMap= new HashMap<>();
     
@@ -163,25 +162,6 @@ public class BrapiRestController implements ServletContextAware {
     
     static
     {
-    	germplasmFields.put("germplasmname", "germplasmName");
-    	germplasmFields.put("defaultdisplayname", "defaultDisplayName");
-    	germplasmFields.put("accessionnumber", "accessionNumber");
-    	germplasmFields.put("germplasmpui", "germplasmPUI");
-    	germplasmFields.put("pedigree", "pedigree");
-    	germplasmFields.put("seedsource", "seedSource");
-    	germplasmFields.put("commoncropname", "commonCropName");
-    	germplasmFields.put("institutecode", "instituteCode");
-    	germplasmFields.put("institutename", "instituteName");
-    	germplasmFields.put("biologicalstatusofaccessioncode", "biologicalStatusOfAccessionCode");
-    	germplasmFields.put("countryoforigincode", "countryOfOriginCode");
-    	germplasmFields.put("typeofgermplasmstoragecode", "typeOfGermplasmStorageCode");
-    	germplasmFields.put("genus", "genus");
-    	germplasmFields.put("species", "species");
-    	germplasmFields.put("speciesauthority", "speciesAuthority");
-    	germplasmFields.put("subtaxa", "subtaxa");
-    	germplasmFields.put("subtaxaauthority", "subtaxaAuthority");
-    	germplasmFields.put("acquisitiondate", "acquisitionDate");
-
     	CallMap call = new CallMap();    	
     	call.put("call", URL_TOKEN);
     	call.put("datatypes", Arrays.asList(new String[] {"json"}));
@@ -684,8 +664,8 @@ public class BrapiRestController implements ServletContextAware {
 				for (String key : additionalInfo.keySet())
 				{
 					String lcKey = CaseUtils.toCamelCase(key, false, '_', '-', '.').toLowerCase();
-					if (germplasmFields.containsKey(lcKey))
-						germplasm.put(germplasmFields.get(lcKey), additionalInfo.get(key));
+					if (BrapiGermplasm.germplasmFields.containsKey(lcKey))
+						germplasm.put(BrapiGermplasm.germplasmFields.get(lcKey), additionalInfo.get(key));
 				}
 			data.add(germplasm);
 		}
