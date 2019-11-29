@@ -104,7 +104,7 @@ import jhi.brapi.api.germplasm.BrapiGermplasm;
  * @author sempere
  *
  */
-@Api(tags = "BrAPI", description = "BrAPI compliant methods")
+@Api(tags = {"BrAPI"}, description = "BrAPI compliant methods")
 @RestController
 public class BrapiRestController implements ServletContextAware {
 
@@ -617,7 +617,7 @@ public class BrapiRestController implements ServletContextAware {
     
     @CrossOrigin
 	@RequestMapping(value = "/{database:.+}" + URL_BASE_PREFIX + "/" + URL_GERMPLASM_SEARCH, method = RequestMethod.POST, consumes = "application/json", produces = "application/json")
-	public Map<String, Object> germplasmSearch(HttpServletRequest request, HttpServletResponse response, @PathVariable String database, @RequestBody GermplasmSearchRequest requestBody) {
+	public Map<String, Object> germplasmSearch(HttpServletResponse response, @PathVariable String database, @RequestBody GermplasmSearchRequest requestBody) {
     	MongoTemplate mongoTemplate = MongoTemplateManager.get(database);
 		if (mongoTemplate == null)
 		{
@@ -666,6 +666,14 @@ public class BrapiRestController implements ServletContextAware {
 					String lcKey = CaseUtils.toCamelCase(key, false, '_', '-', '.').toLowerCase();
 					if (BrapiGermplasm.germplasmFields.containsKey(lcKey))
 						germplasm.put(BrapiGermplasm.germplasmFields.get(lcKey), additionalInfo.get(key));
+					else {
+						Map<String, String> brapiAdditionalInfo = (Map<String, String>) germplasm.get("additionalInfo");
+						if (brapiAdditionalInfo == null) {
+							brapiAdditionalInfo = new HashMap<>();
+							germplasm.put("additionalInfo", brapiAdditionalInfo);
+						}
+						brapiAdditionalInfo.put(key, additionalInfo.get(key).toString());
+					}
 				}
 			data.add(germplasm);
 		}
@@ -677,7 +685,7 @@ public class BrapiRestController implements ServletContextAware {
 
     @CrossOrigin
 	@RequestMapping(value = "/{database:.+}" + URL_BASE_PREFIX + "/" + URL_GERMPLASM_SEARCH, method = RequestMethod.GET, produces = "application/json")
-	public Map<String, Object> germplasmSearch(HttpServletRequest request, HttpServletResponse response, @PathVariable String database, @RequestParam(required = false) String germplasmPUI, @RequestParam(required = false) String germplasmDbId, @RequestParam(required = false) String germplasmName, @RequestParam(required = false) Integer pageSize, @RequestParam(required = false) Integer page) {
+	public Map<String, Object> germplasmSearch(HttpServletResponse response, @PathVariable String database, @RequestParam(required = false) String germplasmPUI, @RequestParam(required = false) String germplasmDbId, @RequestParam(required = false) String germplasmName, @RequestParam(required = false) Integer pageSize, @RequestParam(required = false) Integer page) {
     	GermplasmSearchRequest requestBody = new GermplasmSearchRequest();
     	if (germplasmPUI != null)
     		requestBody.germplasmPUIs = Arrays.asList(germplasmPUI);
@@ -688,15 +696,15 @@ public class BrapiRestController implements ServletContextAware {
     	requestBody.pageSize = pageSize;
     	requestBody.page = page;
     	
-    	return germplasmSearch(request, response, database, requestBody);
+    	return germplasmSearch(response, database, requestBody);
 	}
     
     @CrossOrigin
 	@RequestMapping(value = "/{database:.+}" + URL_BASE_PREFIX + "/" + URL_GERMPLASM_DETAILS, method = RequestMethod.GET, produces = "application/json")
-	public Map<String, Object> germplasmDetails(HttpServletRequest request, HttpServletResponse response, @PathVariable String database, @PathVariable("germplasmDbId") String germplasmDbId, @RequestParam(required = false) Integer pageSize, @RequestParam(required = false) Integer page) throws IOException {
+	public Map<String, Object> germplasmDetails(HttpServletResponse response, @PathVariable String database, @PathVariable("germplasmDbId") String germplasmDbId, @RequestParam(required = false) Integer pageSize, @RequestParam(required = false) Integer page) throws IOException {
     	Map<String, Object> resultObject = getStandardResponse(0, 0, 0, 0, false);
     	
-    	Map<String, Object> resultList = germplasmSearch(request, response, database, null, germplasmDbId, null, pageSize, page);
+    	Map<String, Object> resultList = germplasmSearch(response, database, null, germplasmDbId, null, pageSize, page);
     	HashMap<String, Object> result = (HashMap<String, Object>) resultList.get("result");
     	ArrayList<Map<String, Object>> data = (ArrayList<Map<String, Object>>) result.get("data");
     	if (data == null || data.size() == 0)
