@@ -129,12 +129,16 @@ public class BrapiRestController implements ServletContextAware {
 	static final private long EXPORT_FILE_EXPIRATION_DELAY_MILLIS = 1000*60*60*24;	/* 1 day */
     
 	static public final String URL_BASE_PREFIX = "/brapi/v1";
-	
+
     static public final String URL_TOKEN = "token";
     static public final String URL_CALLS = "calls";
+
+	static public final String URL_GERMPLASM_SEARCH_V1_3 = "search/germplasm";
+
     static public final String URL_MAPS = "maps";
     static public final String URL_STUDY_GERMPLASMS_V1_0 = "studies/{id}/germplasm";
-	static public final String URL_MARKERS_SEARCH = "markers-search";
+    static public final String URL_GERMPLASM_ATTRIBUTES = "germplasm/{germplasmDbId}/attributes";
+    static public final String URL_MARKERS_SEARCH = "markers-search";
 	static public final String URL_MARKER_DETAILS = "markers/{markerDbId}";
 	static public final String URL_MAP_DETAILS = URL_MAPS + "/{mapDbId}";
 	static public final String URL_MAP_POSITIONS = URL_MAPS + "/{mapDbId}/positions";
@@ -172,6 +176,12 @@ public class BrapiRestController implements ServletContextAware {
     	call.put("call", URL_CALLS);
     	call.put("datatypes", Arrays.asList(new String[] {"json"}));
     	call.put("methods", new String[] {"GET"});
+    	implementedCalls.add(call);
+
+    	call = new CallMap();
+    	call.put("call", URL_GERMPLASM_SEARCH_V1_3);
+    	call.put("datatypes", Arrays.asList(new String[] {"json"}));
+    	call.put("methods", new String[] {"POST"});
     	implementedCalls.add(call);
     	
     	call = new CallMap();
@@ -242,6 +252,12 @@ public class BrapiRestController implements ServletContextAware {
     	
     	call = new CallMap();
     	call.put("call", URL_GERMPLASM_SEARCH);
+    	call.put("datatypes", Arrays.asList(new String[] {"json"}));
+    	call.put("methods", new String[] {"POST"});
+    	implementedCalls.add(call);
+
+    	call = new CallMap();
+    	call.put("call", URL_GERMPLASM_ATTRIBUTES);
     	call.put("datatypes", Arrays.asList(new String[] {"json"}));
     	call.put("methods", new String[] {"GET"});
     	implementedCalls.add(call);
@@ -614,10 +630,45 @@ public class BrapiRestController implements ServletContextAware {
     	public Integer pageSize;
     	public Integer page;
     }
-    
+
     @CrossOrigin
-	@RequestMapping(value = "/{database:.+}" + URL_BASE_PREFIX + "/" + URL_GERMPLASM_SEARCH, method = RequestMethod.POST, consumes = "application/json", produces = "application/json")
-	public Map<String, Object> germplasmSearch(HttpServletResponse response, @PathVariable String database, @RequestBody GermplasmSearchRequest requestBody) {
+	@RequestMapping(value = "/{database:.+}" + URL_BASE_PREFIX + "/" + URL_GERMPLASM_ATTRIBUTES, method = RequestMethod.GET, produces = "application/json")
+	public Map<String, Object> germplasmAttributes(HttpServletRequest request, HttpServletResponse response, @PathVariable String database, @PathVariable("germplasmDbId") String germplasmDbId, @RequestParam(required = false) Integer pageSize, @RequestParam(required = false) Integer page) throws IOException, ObjectNotFoundException {
+    	MongoTemplate mongoTemplate = MongoTemplateManager.get(database);
+		if (mongoTemplate == null)
+		{
+			response.setStatus(HttpServletResponse.SC_NOT_FOUND);
+			return null;
+		}
+
+		if (!tokenManager.canUserReadDB(tokenManager.readToken(request), database))
+		{
+			response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+			return null;
+		}
+
+    	HashMap<String, Object> result = new HashMap<>();
+		Individual ind = mongoTemplate.findOne(new Query(Criteria.where("_id").is(germplasmDbId)), Individual.class);
+    	if (ind == null)
+    	{
+    		build404Response(response);
+    		return null;
+    	}
+
+    	ArrayList<Map<String, Object>> data = new ArrayList<>();
+		for (String attributeDbId : ind.getAdditionalInfo().keySet())
+			data.add(new HashMap<String, Object>() {{ put("attributeDbId", attributeDbId); put("value", ind.getAdditionalInfo().get(attributeDbId)); }});
+
+    	result.put("data", data);
+
+    	Map<String, Object> resultObject = getStandardResponse(0, 1, data.size(), 0, false);
+    	resultObject.put("result", result);
+    	return resultObject;
+    }
+
+    @CrossOrigin
+	@RequestMapping(value = {"/{database:.+}" + URL_BASE_PREFIX + "/" + URL_GERMPLASM_SEARCH_V1_3, "/{database:.+}" + URL_BASE_PREFIX + "/" + URL_GERMPLASM_SEARCH}, method = RequestMethod.POST, consumes = "application/json", produces = "application/json")
+	public Map<String, Object> germplasmSearch(HttpServletRequest request, HttpServletResponse response, @PathVariable String database, @RequestBody GermplasmSearchRequest requestBody) throws ObjectNotFoundException {
     	MongoTemplate mongoTemplate = MongoTemplateManager.get(database);
 		if (mongoTemplate == null)
 		{
@@ -625,6 +676,12 @@ public class BrapiRestController implements ServletContextAware {
 			return null;
 		}
 //		LOG.debug("germplasmSearch called");
+		
+		if (!tokenManager.canUserReadDB(tokenManager.readToken(request), database))
+		{
+			response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+			return null;
+		}
 
 		if (requestBody.germplasmPUIs != null || requestBody.germplasmGenus != null || requestBody.accessionNumbers != null )
 			return getStandardResponse(0, 0, 0, 0, false);	// those parameters are not supported at the moment
@@ -666,14 +723,6 @@ public class BrapiRestController implements ServletContextAware {
 					String lcKey = CaseUtils.toCamelCase(key, false, '_', '-', '.').toLowerCase();
 					if (BrapiGermplasm.germplasmFields.containsKey(lcKey))
 						germplasm.put(BrapiGermplasm.germplasmFields.get(lcKey), additionalInfo.get(key));
-					else {
-						Map<String, String> brapiAdditionalInfo = (Map<String, String>) germplasm.get("additionalInfo");
-						if (brapiAdditionalInfo == null) {
-							brapiAdditionalInfo = new HashMap<>();
-							germplasm.put("additionalInfo", brapiAdditionalInfo);
-						}
-						brapiAdditionalInfo.put(key, additionalInfo.get(key).toString());
-					}
 				}
 			data.add(germplasm);
 		}
@@ -685,7 +734,7 @@ public class BrapiRestController implements ServletContextAware {
 
     @CrossOrigin
 	@RequestMapping(value = "/{database:.+}" + URL_BASE_PREFIX + "/" + URL_GERMPLASM_SEARCH, method = RequestMethod.GET, produces = "application/json")
-	public Map<String, Object> germplasmSearch(HttpServletResponse response, @PathVariable String database, @RequestParam(required = false) String germplasmPUI, @RequestParam(required = false) String germplasmDbId, @RequestParam(required = false) String germplasmName, @RequestParam(required = false) Integer pageSize, @RequestParam(required = false) Integer page) {
+	public Map<String, Object> germplasmSearch(HttpServletRequest request, HttpServletResponse response, @PathVariable String database, @RequestParam(required = false) String germplasmPUI, @RequestParam(required = false) String germplasmDbId, @RequestParam(required = false) String germplasmName, @RequestParam(required = false) Integer pageSize, @RequestParam(required = false) Integer page) throws ObjectNotFoundException {
     	GermplasmSearchRequest requestBody = new GermplasmSearchRequest();
     	if (germplasmPUI != null)
     		requestBody.germplasmPUIs = Arrays.asList(germplasmPUI);
@@ -696,15 +745,15 @@ public class BrapiRestController implements ServletContextAware {
     	requestBody.pageSize = pageSize;
     	requestBody.page = page;
     	
-    	return germplasmSearch(response, database, requestBody);
+    	return germplasmSearch(request, response, database, requestBody);
 	}
     
     @CrossOrigin
 	@RequestMapping(value = "/{database:.+}" + URL_BASE_PREFIX + "/" + URL_GERMPLASM_DETAILS, method = RequestMethod.GET, produces = "application/json")
-	public Map<String, Object> germplasmDetails(HttpServletResponse response, @PathVariable String database, @PathVariable("germplasmDbId") String germplasmDbId, @RequestParam(required = false) Integer pageSize, @RequestParam(required = false) Integer page) throws IOException {
+	public Map<String, Object> germplasmDetails(HttpServletRequest request, HttpServletResponse response, @PathVariable String database, @PathVariable("germplasmDbId") String germplasmDbId, @RequestParam(required = false) Integer pageSize, @RequestParam(required = false) Integer page) throws IOException, ObjectNotFoundException {
     	Map<String, Object> resultObject = getStandardResponse(0, 0, 0, 0, false);
     	
-    	Map<String, Object> resultList = germplasmSearch(response, database, null, germplasmDbId, null, pageSize, page);
+    	Map<String, Object> resultList = germplasmSearch(request, response, database, null, germplasmDbId, null, pageSize, page);
     	HashMap<String, Object> result = (HashMap<String, Object>) resultList.get("result");
     	ArrayList<Map<String, Object>> data = (ArrayList<Map<String, Object>>) result.get("data");
     	if (data == null || data.size() == 0)
