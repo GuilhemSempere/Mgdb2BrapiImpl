@@ -51,9 +51,15 @@ import org.apache.commons.collections.map.UnmodifiableMap;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.lang.exception.ExceptionUtils;
 import org.apache.commons.text.CaseUtils;
+import org.bson.types.ObjectId;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.TypeAlias;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.index.Indexed;
+import org.springframework.data.mongodb.core.mapping.Field;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -92,7 +98,6 @@ import fr.cirad.tools.Helper;
 import fr.cirad.tools.ProgressIndicator;
 import fr.cirad.tools.mongo.MongoTemplateManager;
 import fr.cirad.tools.security.base.AbstractTokenManager;
-import io.swagger.annotations.Api;
 import io.swagger.annotations.ApiOperation;
 import jhi.brapi.api.Metadata;
 import jhi.brapi.api.Pagination;
@@ -104,7 +109,7 @@ import jhi.brapi.api.germplasm.BrapiGermplasm;
  * @author sempere
  *
  */
-@Api(tags = {"BrAPI"}, description = "BrAPI compliant methods")
+//@Api(tags = {"BrAPI"}, description = "BrAPI compliant methods")
 @RestController
 public class BrapiRestController implements ServletContextAware {
 
@@ -130,13 +135,17 @@ public class BrapiRestController implements ServletContextAware {
     
 	static public final String URL_BASE_PREFIX = "/brapi/v1";
 
-    static public final String URL_TOKEN = "token";
     static public final String URL_CALLS = "calls";
 
+    static public final String URL_LOGIN_V1_3 = "login";
+    static public final String URL_LOGOUT_V1_3 = "logout";
 	static public final String URL_GERMPLASM_SEARCH_V1_3 = "search/germplasm";
+	static public final String URL_GERMPLASM_SEARCH_RESULT_V1_3 = "search/germplasm/{searchResultsDbId}";
+    static public final String URL_STUDIES_V1_3 = "studies";
 
+	/* calls without a version number specified are by default v1.1 */
+    static public final String URL_TOKEN = "token";
     static public final String URL_MAPS = "maps";
-    static public final String URL_STUDY_GERMPLASMS_V1_0 = "studies/{id}/germplasm";
     static public final String URL_GERMPLASM_ATTRIBUTES = "germplasm/{germplasmDbId}/attributes";
     static public final String URL_MARKERS_SEARCH = "markers-search";
 	static public final String URL_MARKER_DETAILS = "markers/{markerDbId}";
@@ -150,11 +159,12 @@ public class BrapiRestController implements ServletContextAware {
     static public final String URL_GERMPLASM_DETAILS = "germplasm/{germplasmDbId}";
     static public final String URL_GERMPLASM_SEARCH = "germplasm-search";
 
-	static public final String URL_MAP_DETAILS_V1_0 = URL_MAPS + "/{id}";
-	static public final String URL_MAP_POSITIONS_V1_0 = URL_MAPS + "/{id}/positions";
+//	static public final String URL_STUDY_GERMPLASMS_V1_0 = "studies/{id}/germplasm";
+//	static public final String URL_MAP_DETAILS_V1_0 = URL_MAPS + "/{id}";
+//	static public final String URL_MAP_POSITIONS_V1_0 = URL_MAPS + "/{id}/positions";
     static public final String URL_MARKERS_SEARCH_V1_0 = "markers";
     
-    static private final TreeSet<Map<String, Object>> implementedCalls = new TreeSet<>();
+    static private final TreeSet<CallMap> implementedCalls = new TreeSet<>();
     protected HashMap<String /*module*/, HashMap<Integer /*marker index when sorted by id*/, Comparable /*marker id*/>> markerIndexByModuleMap= new HashMap<>();
     
     static class CallMap extends HashMap<String, Object> implements Comparable<CallMap> {	// for auto-sorting by call URL
@@ -168,123 +178,164 @@ public class BrapiRestController implements ServletContextAware {
     {
     	CallMap call = new CallMap();    	
     	call.put("call", URL_TOKEN);
-    	call.put("datatypes", Arrays.asList(new String[] {"json"}));
+    	call.put("dataTypes", Arrays.asList(new String[] {"application/json"}));
     	call.put("methods", new String[] {"POST", "DELETE"});
+    	call.put("versions", new String[] {"1.1"});
     	implementedCalls.add(call);
 
+    	call = new CallMap();    	
+    	call.put("call", URL_LOGIN_V1_3);
+    	call.put("dataTypes", Arrays.asList(new String[] {"application/json"}));
+    	call.put("methods", new String[] {"POST"});
+    	call.put("versions", new String[] {"1.3"});
+    	implementedCalls.add(call);
+    	
+    	call = new CallMap();    	
+    	call.put("call", URL_LOGOUT_V1_3);
+    	call.put("dataTypes", Arrays.asList(new String[] {"application/json"}));
+    	call.put("methods", new String[] {"DELETE"});
+    	call.put("versions", new String[] {"1.3"});
+    	implementedCalls.add(call);
+    	
     	call = new CallMap();
     	call.put("call", URL_CALLS);
-    	call.put("datatypes", Arrays.asList(new String[] {"json"}));
+    	call.put("dataTypes", Arrays.asList(new String[] {"application/json"}));
     	call.put("methods", new String[] {"GET"});
+    	call.put("versions", new String[] {"1.1", "1.3"});
     	implementedCalls.add(call);
 
     	call = new CallMap();
     	call.put("call", URL_GERMPLASM_SEARCH_V1_3);
-    	call.put("datatypes", Arrays.asList(new String[] {"json"}));
+    	call.put("dataTypes", Arrays.asList(new String[] {"application/json"}));
     	call.put("methods", new String[] {"POST"});
+    	call.put("versions", new String[] {"1.3"});
     	implementedCalls.add(call);
     	
     	call = new CallMap();
     	call.put("call", URL_STUDIES);
-    	call.put("datatypes", Arrays.asList(new String[] {"json"}));
+    	call.put("dataTypes", Arrays.asList(new String[] {"application/json"}));
     	call.put("methods", new String[] {"GET"});
+    	call.put("versions", new String[] {"1.1"});
+    	implementedCalls.add(call);
+    	
+    	call = new CallMap();
+    	call.put("call", URL_STUDIES_V1_3);
+    	call.put("dataTypes", Arrays.asList(new String[] {"application/json"}));
+    	call.put("methods", new String[] {"GET"});
+    	call.put("versions", new String[] {"1.3"});
     	implementedCalls.add(call);
     	
     	call = new CallMap();
     	call.put("call", URL_MAPS);
-    	call.put("datatypes", Arrays.asList(new String[] {"json"}));
+    	call.put("dataTypes", Arrays.asList(new String[] {"application/json"}));
     	call.put("methods", new String[] {"GET"});
+    	call.put("versions", new String[] {"1.1", "1.3"});
     	implementedCalls.add(call);
     	
     	call = new CallMap();
     	call.put("call", URL_MARKER_PROFILES);
-    	call.put("datatypes", Arrays.asList(new String[] {"json"}));
+    	call.put("dataTypes", Arrays.asList(new String[] {"application/json"}));
     	call.put("methods", new String[] {"GET"});
+    	call.put("versions", new String[] {"1.1", "1.3"});
     	implementedCalls.add(call);
 
     	call = new CallMap();
     	call.put("call", URL_ALLELE_MATRIX);
-    	call.put("datatypes", Arrays.asList(new String[] {"tsv", "json"}));
+    	call.put("dataTypes", Arrays.asList(new String[] {"text/tsv", "application/json"}));
     	call.put("methods", new String[] {"POST", "GET"});
+    	call.put("versions", new String[] {"1.1"});
     	implementedCalls.add(call);
     	
     	call = new CallMap();
     	call.put("call", URL_ALLELE_MATRIX_STATUS);
-    	call.put("datatypes", Arrays.asList(new String[] {"json"}));
+    	call.put("dataTypes", Arrays.asList(new String[] {"application/json"}));
     	call.put("methods", new String[] {"GET"});
+    	call.put("versions", new String[] {"1.1"});
     	implementedCalls.add(call);
 
     	call = new CallMap();
     	call.put("call", URL_MAP_DETAILS);
-    	call.put("datatypes", Arrays.asList(new String[] {"json"}));
+    	call.put("dataTypes", Arrays.asList(new String[] {"application/json"}));
     	call.put("methods", new String[] {"GET"});
+    	call.put("versions", new String[] {"1.1", "1.3"});
     	implementedCalls.add(call);
     	
     	call = new CallMap();
     	call.put("call", URL_MAP_POSITIONS);
-    	call.put("datatypes", Arrays.asList(new String[] {"json"}));
+    	call.put("dataTypes", Arrays.asList(new String[] {"application/json"}));
     	call.put("methods", new String[] {"GET"});
+    	call.put("versions", new String[] {"1.1", "1.3"});
     	implementedCalls.add(call);
     	
     	call = new CallMap();
     	call.put("call", URL_MARKERS_SEARCH);
-    	call.put("datatypes", Arrays.asList(new String[] {"json"}));
+    	call.put("dataTypes", Arrays.asList(new String[] {"application/json"}));
     	call.put("methods", new String[] {"POST", "GET"});
+    	call.put("versions", new String[] {"1.1"});
     	implementedCalls.add(call);
     	
     	call = new CallMap();
     	call.put("call", URL_MARKER_DETAILS);
-    	call.put("datatypes", Arrays.asList(new String[] {"json"}));
+    	call.put("dataTypes", Arrays.asList(new String[] {"application/json"}));
     	call.put("methods", new String[] {"GET"});
+    	call.put("versions", new String[] {"1.1"});
     	implementedCalls.add(call);
     	
     	call = new CallMap();
     	call.put("call", URL_STUDY_GERMPLASMS);
-    	call.put("datatypes", Arrays.asList(new String[] {"json"}));
+    	call.put("dataTypes", Arrays.asList(new String[] {"application/json"}));
     	call.put("methods", new String[] {"GET"});
+    	call.put("versions", new String[] {"1.1", "1.3"});
     	implementedCalls.add(call);
     	
     	call = new CallMap();
     	call.put("call", URL_GERMPLASM_DETAILS);
-    	call.put("datatypes", Arrays.asList(new String[] {"json"}));
+    	call.put("dataTypes", Arrays.asList(new String[] {"application/json"}));
     	call.put("methods", new String[] {"GET"});
+    	call.put("versions", new String[] {"1.1"});
     	implementedCalls.add(call);
     	
     	call = new CallMap();
     	call.put("call", URL_GERMPLASM_SEARCH);
-    	call.put("datatypes", Arrays.asList(new String[] {"json"}));
+    	call.put("dataTypes", Arrays.asList(new String[] {"application/json"}));
     	call.put("methods", new String[] {"POST"});
+    	call.put("versions", new String[] {"1.1"});
     	implementedCalls.add(call);
 
     	call = new CallMap();
     	call.put("call", URL_GERMPLASM_ATTRIBUTES);
-    	call.put("datatypes", Arrays.asList(new String[] {"json"}));
+    	call.put("dataTypes", Arrays.asList(new String[] {"application/json"}));
     	call.put("methods", new String[] {"GET"});
+    	call.put("versions", new String[] {"1.1", "1.3"});
     	implementedCalls.add(call);
     	
-    	call = new CallMap();
-    	call.put("call", URL_MAP_DETAILS_V1_0);
-    	call.put("datatypes", Arrays.asList(new String[] {"json"}));
-    	call.put("methods", new String[] {"GET"});
-    	implementedCalls.add(call);
+//    	call = new CallMap();
+//    	call.put("call", URL_MAP_DETAILS_V1_0);
+//    	call.put("dataTypes", Arrays.asList(new String[] {"application/json"}));
+//    	call.put("methods", new String[] {"GET"});
+//    	call.put("versions", new String[] {"1.0"});
+//    	implementedCalls.add(call);
 
     	call = new CallMap();
     	call.put("call", URL_MARKERS_SEARCH_V1_0);
-    	call.put("datatypes", Arrays.asList(new String[] {"json"}));
+    	call.put("dataTypes", Arrays.asList(new String[] {"application/json"}));
     	call.put("methods", new String[] {"GET"});
+    	call.put("versions", new String[] {"1.0"});
     	implementedCalls.add(call);
     	
-    	call = new CallMap();
-    	call.put("call", URL_MAP_POSITIONS_V1_0);
-    	call.put("datatypes", Arrays.asList(new String[] {"json"}));
-    	call.put("methods", new String[] {"GET"});
-    	implementedCalls.add(call);
+//    	call = new CallMap();
+//    	call.put("call", URL_MAP_POSITIONS_V1_0);
+//    	call.put("dataTypes", Arrays.asList(new String[] {"application/json"}));
+//    	call.put("methods", new String[] {"GET"});
+//    	call.put("versions", new String[] {"1.0"});
+//    	implementedCalls.add(call);
     	
-    	call = new CallMap();
-    	call.put("call", URL_STUDY_GERMPLASMS_V1_0);
-    	call.put("datatypes", Arrays.asList(new String[] {"json"}));
-    	call.put("methods", new String[] {"GET"});
-    	implementedCalls.add(call);
+//    	call = new CallMap();
+//    	call.put("call", URL_STUDY_GERMPLASMS_V1_0);
+//    	call.put("dataTypes", Arrays.asList(new String[] {"application/json"}));
+//    	call.put("methods", new String[] {"GET"});
+//    	call.put("versions", new String[] {"1.0"});
+//    	implementedCalls.add(call);
     }
 
     /**
@@ -361,9 +412,12 @@ public class BrapiRestController implements ServletContextAware {
 		
 //    	LOG.debug("calls called");
     	ArrayList<Map<String, Object>> data = new ArrayList<>();
-    	for (Map<String, Object> call : implementedCalls)
-    		if (datatype == null || ((List<String>) call.get("datatypes")).contains(datatype))
+    	for (CallMap call : implementedCalls)
+    		if (datatype == null || ((List<String>) call.get("dataTypes")).contains(datatype)) {
+    			call.put("datatypes", call.get("dataTypes")); // hack to remain compatible with v1.1
     			data.add(call);
+    		}
+    	
     	
     	Map<String, Object> resultObject = getStandardResponse(data.size(), page, implementedCalls.size(), pageSize, true);
     	((Map<String, Object>) resultObject.get("result")).put("data", data);
@@ -410,19 +464,24 @@ public class BrapiRestController implements ServletContextAware {
     	((Map<String, Object>) resultObject.get("result")).put("data", data);
     	return resultObject;
 	}
-    
+   
     @CrossOrigin
 	@RequestMapping(value = "/{database:.+}" + URL_BASE_PREFIX + "/" + URL_MAP_DETAILS, method = RequestMethod.GET, produces = "application/json")
 	public Map<String, Object> mapDetails(HttpServletRequest request, HttpServletResponse response, @PathVariable String database, @PathVariable("mapDbId") String mapDbId, @RequestParam(required = false) Integer pageSize, @RequestParam(required = false) Integer page) throws IOException {
 		MongoTemplate mongoTemplate = MongoTemplateManager.get(mapDbId);
 //		LOG.debug("mapDetails called");
 		
+		if (!database.equals(mapDbId)) {
+			build404Response(response);
+			return null;
+		}
+		
 		Map<String, Object> resultObject = getStandardResponse(0, 0, 0, 0, false);
 		Map<String, Object> map = new HashMap<>();
 		try {
 			if (tokenManager.canUserReadDB(tokenManager.readToken(request), database))
 			{
-				map.put("mapDbId", 0);
+				map.put("mapDbId", mapDbId);
 				map.put("name", database + " map");
 				map.put("type", "Physical");
 				map.put("unit", "Mb");
@@ -444,6 +503,11 @@ public class BrapiRestController implements ServletContextAware {
 					HashMap<String, Comparable> linkageGroup = new HashMap<>();
 					linkageGroup.put("linkageGroupName", obj.getString("_id"));
 					linkageGroup.put("markerCount", obj.getInt("count"));
+					Query query = new Query(Criteria.where(VariantData.FIELDNAME_REFERENCE_POSITION + "." + ReferencePosition.FIELDNAME_SEQUENCE).is(obj.getString("_id")));
+					query.with(new Sort(Sort.Direction.DESC, VariantData.FIELDNAME_REFERENCE_POSITION + "." + ReferencePosition.FIELDNAME_START_SITE)).limit(1);
+					query.fields().include(VariantData.FIELDNAME_REFERENCE_POSITION + "." + ReferencePosition.FIELDNAME_START_SITE);
+					VariantData variant = mongoTemplate.findOne(query, VariantData.class);
+					linkageGroup.put("maxPosition", variant.getReferencePosition().getStartSite());
 					linkageGroups.add(linkageGroup);
 				}
 				if (!linkageGroups.isEmpty())
@@ -553,7 +617,7 @@ public class BrapiRestController implements ServletContextAware {
 	}
 
     @CrossOrigin
-	@RequestMapping(value = "/{database:.+}" + URL_BASE_PREFIX + "/" + URL_STUDIES, method = RequestMethod.GET, produces = "application/json")
+	@RequestMapping(value = {"/{database:.+}" + URL_BASE_PREFIX + "/" + URL_STUDIES, "/{database:.+}" + URL_BASE_PREFIX + "/" + URL_STUDIES_V1_3}, method = RequestMethod.GET, produces = "application/json")
 	public Map<String, Object> studySummaryList(HttpServletRequest request, HttpServletResponse response, @PathVariable String database, @RequestParam(required = false) String studyType,
 			@RequestParam(required = false) Integer pageSize, @RequestParam(required = false) Integer page) {
 		MongoTemplate mongoTemplate = MongoTemplateManager.get(database);
@@ -580,7 +644,7 @@ public class BrapiRestController implements ServletContextAware {
 				study.put("startDate", gp.getCreationDate());
 				study.put("studyType", "genotype");
 				study.put("additionalInfo", additionalInfo);
-				additionalInfo.put("ploidy", gp.getPloidyLevel());
+				additionalInfo.put("ploidy", String.valueOf(gp.getPloidyLevel()));
 				if (gp.getDescription() != null)
 					additionalInfo.put("description", gp.getDescription());
 				data.add(study);
@@ -612,6 +676,7 @@ public class BrapiRestController implements ServletContextAware {
 				Map<String, Object> germplasm = new HashMap<>();
 				germplasm.put("germplasmDbId", individual);
 				germplasm.put("germplasmName", individual);
+				germplasm.put("studyDbId", studyDbId);
 				data.add(germplasm);
 			}
 		
@@ -620,7 +685,12 @@ public class BrapiRestController implements ServletContextAware {
 	    return resultObject;
 	}
 
+    @org.springframework.data.mongodb.core.mapping.Document(collection="brapiGermplasmSearches")
+    @TypeAlias("BGS")
     static public class GermplasmSearchRequest {
+    	static private final String FIELDNAME_CREATION_DATE = "cd";
+    	@Id private ObjectId _id;
+    	@Field(value=FIELDNAME_CREATION_DATE) @Indexed(expireAfterSeconds=60*5) public Date createdAt = new Date();
     	public Collection<String> germplasmPUIs;
     	public Collection<String> germplasmDbIds;
     	public Collection<String> germplasmNames;
@@ -683,6 +753,45 @@ public class BrapiRestController implements ServletContextAware {
 			return null;
 		}
 
+		mongoTemplate.insert(requestBody);
+
+		Map<String, Object> resultObject = getStandardResponse(0, 0, 0, 0, false);
+		resultObject.put("result", new HashMap<String, Object>() {{ put("searchResultsDbId", requestBody._id.toString()); put("searchResultDbId", requestBody._id.toString()); }});
+		LOG.debug("Germplasm search criteria saved as " + requestBody._id);
+	    return resultObject;
+	}
+    
+    @CrossOrigin
+	@RequestMapping(value = "/{database:.+}" + URL_BASE_PREFIX + "/" + URL_GERMPLASM_SEARCH_RESULT_V1_3, method = RequestMethod.GET, produces = "application/json")
+    public Map<String, Object> getGermplasmSearchResults(HttpServletRequest request, HttpServletResponse response, @PathVariable String database, @PathVariable("searchResultsDbId") String searchResultsDbId) throws ObjectNotFoundException, IOException {
+    	MongoTemplate mongoTemplate = MongoTemplateManager.get(database);
+    	GermplasmSearchRequest requestBody = mongoTemplate.findById(searchResultsDbId, GermplasmSearchRequest.class);
+    	if (requestBody == null) {	// it either expired or never existed
+    		build404Response(response);
+    		return null;
+    	}
+
+    	return executeGermplasmSearch(request, response, database, requestBody);
+    }
+
+    @CrossOrigin
+	@RequestMapping(value = "/{database:.+}" + URL_BASE_PREFIX + "/" + URL_GERMPLASM_SEARCH, method = RequestMethod.GET, produces = "application/json")
+	public Map<String, Object> germplasmSearch(HttpServletRequest request, HttpServletResponse response, @PathVariable String database, @RequestParam(required = false) String germplasmPUI, @RequestParam(required = false) String germplasmDbId, @RequestParam(required = false) String germplasmName, @RequestParam(required = false) Integer pageSize, @RequestParam(required = false) Integer page) throws ObjectNotFoundException, IOException {
+    	GermplasmSearchRequest requestBody = new GermplasmSearchRequest();
+    	if (germplasmPUI != null)
+    		requestBody.germplasmPUIs = Arrays.asList(germplasmPUI);
+    	if (germplasmDbId != null)
+	    	requestBody.germplasmDbIds = Arrays.asList(germplasmDbId);
+    	if (germplasmName != null)
+	    	requestBody.germplasmNames = Arrays.asList(germplasmName);
+    	requestBody.pageSize = pageSize;
+    	requestBody.page = page;
+    	
+    	return executeGermplasmSearch(request, response, database, requestBody);
+	}
+    
+    // This method does the actual data retrieval, it shall be called by methods mapped to various call versions
+    public Map<String, Object> executeGermplasmSearch(HttpServletRequest request, HttpServletResponse response, String database, GermplasmSearchRequest requestBody) throws ObjectNotFoundException, IOException {
 		if (requestBody.germplasmPUIs != null || requestBody.germplasmGenus != null || requestBody.accessionNumbers != null )
 			return getStandardResponse(0, 0, 0, 0, false);	// those parameters are not supported at the moment
 
@@ -699,6 +808,7 @@ public class BrapiRestController implements ServletContextAware {
 		if (requestBody.germplasmNames != null)
 			indIDs.addAll(requestBody.germplasmNames);
 
+    	MongoTemplate mongoTemplate = MongoTemplateManager.get(database);
 		Query q = indIDs.size() > 0 ? new Query(Criteria.where("_id").in(indIDs)) : null;
         long count = mongoTemplate.count(q, Individual.class);
 		
@@ -730,23 +840,7 @@ public class BrapiRestController implements ServletContextAware {
     	Map<String, Object> resultObject = getStandardResponse((int) (requestBody.pageSize == null ? count : Math.min(requestBody.pageSize, count)), requestBody.pageSize == null || requestBody.page== null || requestBody.page < 1  ? 0 : requestBody.page, count, requestBody.pageSize, true);
     	((Map<String, Object>) resultObject.get("result")).put("data", data);
 	    return resultObject;
-	}
-
-    @CrossOrigin
-	@RequestMapping(value = "/{database:.+}" + URL_BASE_PREFIX + "/" + URL_GERMPLASM_SEARCH, method = RequestMethod.GET, produces = "application/json")
-	public Map<String, Object> germplasmSearch(HttpServletRequest request, HttpServletResponse response, @PathVariable String database, @RequestParam(required = false) String germplasmPUI, @RequestParam(required = false) String germplasmDbId, @RequestParam(required = false) String germplasmName, @RequestParam(required = false) Integer pageSize, @RequestParam(required = false) Integer page) throws ObjectNotFoundException {
-    	GermplasmSearchRequest requestBody = new GermplasmSearchRequest();
-    	if (germplasmPUI != null)
-    		requestBody.germplasmPUIs = Arrays.asList(germplasmPUI);
-    	if (germplasmDbId != null)
-	    	requestBody.germplasmDbIds = Arrays.asList(germplasmDbId);
-    	if (germplasmName != null)
-	    	requestBody.germplasmNames = Arrays.asList(germplasmName);
-    	requestBody.pageSize = pageSize;
-    	requestBody.page = page;
-    	
-    	return germplasmSearch(request, response, database, requestBody);
-	}
+    }
     
     @CrossOrigin
 	@RequestMapping(value = "/{database:.+}" + URL_BASE_PREFIX + "/" + URL_GERMPLASM_DETAILS, method = RequestMethod.GET, produces = "application/json")
@@ -802,13 +896,17 @@ public class BrapiRestController implements ServletContextAware {
 			{
 				Map<String, Object> markerProfile = new HashMap<>();
 				String germplasmId = sample.getIndividual();
-				markerProfile.put("markerprofileDbId", sample.getId());
-				markerProfile.put("uniqueDisplayName", sample.getId());
+				markerProfile.put("markerprofileDbId", sample.getId().toString());
+				markerProfile.put("uniqueDisplayName", sample.getId().toString());
 				markerProfile.put("germplasmDbId", germplasmId);
 				markerProfile.put("sampleDbId", "" + sample.getId());
 				markerProfile.put("analysisMethod", gp.getTechnology());
-//				long resultCount = mongoTemplate.count(new Query(Criteria.where("_id." + VariantRunDataId.FIELDNAME_PROJECT_ID).is(gp.getId()).andOperator(Criteria.where(VariantRunData.FIELDNAME_SAMPLEGENOTYPES + "." + sampleId.getSampleIndex() + "." + SampleGenotype.FIELDNAME_GENOTYPECODE).exists(true))), VariantRunData.class);
-//				markerProfile.put("resultCount", resultCount);
+				markerProfile.put("extractDbId", "");
+//				long resultCount = mongoTemplate.count(new Query(new Criteria().andOperator(
+//						Criteria.where("_id." + VariantRunDataId.FIELDNAME_PROJECT_ID).is(gp.getId()),
+//						Criteria.where(VariantRunData.FIELDNAME_SAMPLEGENOTYPES + "." + sample.getId() + "." + SampleGenotype.FIELDNAME_GENOTYPECODE).exists(true))
+//					), VariantRunData.class);
+//				markerProfile.put("resultCount", resultCount); // takes too much time to respond on big databases
 				data.add(markerProfile);
 			}
 		}
@@ -1051,7 +1149,7 @@ public class BrapiRestController implements ServletContextAware {
     	String unPhasedSeparator = sepUnphased == null ? "/" : sepUnphased;
     	String phasedSeparator = sepPhased == null ? "|" : URLDecoder.decode(sepPhased, "UTF-8");
 
-		if ("tsv".equalsIgnoreCase(format))
+		if ("text/tsv".equalsIgnoreCase(format) || "tsv".equalsIgnoreCase(format))
 		{
 			resultObject = getStandardResponse(0, 0, 0, 0, true);
 			Status status = new Status();
@@ -1273,7 +1371,7 @@ public class BrapiRestController implements ServletContextAware {
 
     @ApiOperation(value = "createToken", notes = "Generates a token using passed credentials")
     @CrossOrigin
-	@RequestMapping(value = "/{database:.+}" + URL_BASE_PREFIX + "/" + URL_TOKEN, method = RequestMethod.POST, produces = "application/json"/*, consumes = "application/json"*/)
+	@RequestMapping(value = {"/{database:.+}" + URL_BASE_PREFIX + "/" + URL_TOKEN, "/{database:.+}" + URL_BASE_PREFIX + "/" + URL_LOGIN_V1_3}, method = RequestMethod.POST, produces = "application/json"/*, consumes = "application/json"*/)
     public Map<String, Object> createToken(HttpServletRequest request, HttpServletResponse response, @PathVariable String database, @RequestBody CreateTokenRequestBody userCredentials) throws IllegalArgumentException, IOException
     {	/*FIXME: don't allow login if not in https*/
 		MongoTemplate mongoTemplate = MongoTemplateManager.get(database);
@@ -1325,7 +1423,7 @@ public class BrapiRestController implements ServletContextAware {
 	}
 
     @CrossOrigin
-	@RequestMapping(value = "/{database:.+}" + URL_BASE_PREFIX + "/" + URL_TOKEN, method = RequestMethod.DELETE, produces = "application/json")
+	@RequestMapping(value = {"/{database:.+}" + URL_BASE_PREFIX + "/" + URL_TOKEN, "/{database:.+}" + URL_BASE_PREFIX + "/" + URL_LOGOUT_V1_3}, method = RequestMethod.DELETE, produces = "application/json")
     public Map<String, Object> clearToken(HttpServletRequest request, HttpServletResponse response, @PathVariable String database, @RequestBody(required=false) ClearTokenRequestBody bodyToken)
 	{
         String token = tokenManager.readToken(request);
