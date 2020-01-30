@@ -1179,7 +1179,7 @@ public class BrapiRestController implements ServletContextAware {
 						
 						fw = new FileWriter(new File(outputLocation.getAbsolutePath() + File.separator + extractId + ".tsv"));
 						fw.write("markerprofileDbIds\t" + StringUtils.join(sortedMarkerprofileDbIDs, "\t"));
-						
+
 						HashMap<GenotypingSample, String> previousPhasingIds = new HashMap<>();
 				        while (nChunkIndex * nChunkSize < finalMarkerList.size())
 				        {
@@ -1188,8 +1188,8 @@ public class BrapiRestController implements ServletContextAware {
 					        List<Object> markerSubList = finalMarkerList.subList(nChunkIndex * nChunkSize, Math.min(finalMarkerList.size(), ++nChunkIndex * nChunkSize));
 							LinkedHashMap<VariantData, Collection<VariantRunData>> variantsAndRuns = MgdbDao.getSampleGenotypes(mongoTemplate, samples, markerSubList, true, null/*new Sort(Sort.Direction.DESC, "_id")*/);
 					        VariantData[] variants = variantsAndRuns.keySet().toArray(new VariantData[variantsAndRuns.size()]);
-							for (int i=0; i<variantsAndRuns.size(); i++)	// read data and write results into temporary files (one per sample)
-							{			
+							for (int i=0; i<variantsAndRuns.size(); i++)
+							{
 								Collection<VariantRunData> runs = variantsAndRuns.get(variants[i]);
 								if (runs != null)
 									for (VariantRunData run : runs)
@@ -1199,8 +1199,10 @@ public class BrapiRestController implements ServletContextAware {
 										for (GenotypingSample sample : samples)
 										{
 											SampleGenotype sampleGenotype = run.getSampleGenotypes().get(sample.getId());
-											if (sampleGenotype == null)
+											if (sampleGenotype == null) {
+												fw.write("\t");
 												continue;	// no data in this run + marker for that sample
+											}
 
 											String currentPhId = (String) sampleGenotype.getAdditionalInfo().get(VariantData.GT_FIELD_PHASED_ID);
 											boolean fPhased = currentPhId != null && currentPhId.equals(previousPhasingIds.get(sample));
@@ -1261,7 +1263,7 @@ public class BrapiRestController implements ServletContextAware {
 
 	        LinkedHashMap<VariantData, Collection<VariantRunData>> variantsAndRuns = MgdbDao.getSampleGenotypes(mongoTemplate, samples, wantedMarkerIDs, true, null/*new Sort(Sort.Direction.DESC, "_id")*/);	// query mongo db for matching genotypes
 	        VariantData[] variants = variantsAndRuns.keySet().toArray(new VariantData[variantsAndRuns.size()]);
-			for (int i=0; i<variantsAndRuns.size(); i++)	// read data and write results into temporary files (one per sample)
+			for (int i=0; i<variantsAndRuns.size(); i++)
 			{			
 				Collection<VariantRunData> runs = variantsAndRuns.get(variants[i]);
 				if (runs != null)
