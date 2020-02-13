@@ -141,12 +141,12 @@ public class BrapiRestController implements ServletContextAware {
     static public final String URL_LOGOUT_V1_3 = "logout";
 	static public final String URL_GERMPLASM_SEARCH_V1_3 = "search/germplasm";
 	static public final String URL_GERMPLASM_SEARCH_RESULT_V1_3 = "search/germplasm/{searchResultsDbId}";
+	static public final String URL_GERMPLASM_SEARCH_GET_V1_3 = "germplasm";
     static public final String URL_STUDIES_V1_3 = "studies";
 
 	/* calls without a version number specified are by default v1.1 */
     static public final String URL_TOKEN = "token";
     static public final String URL_MAPS = "maps";
-    static public final String URL_GERMPLASM_ATTRIBUTES = "germplasm/{germplasmDbId}/attributes";
     static public final String URL_MARKERS_SEARCH = "markers-search";
 	static public final String URL_MARKER_DETAILS = "markers/{markerDbId}";
 	static public final String URL_MAP_DETAILS = URL_MAPS + "/{mapDbId}";
@@ -158,6 +158,7 @@ public class BrapiRestController implements ServletContextAware {
     static public final String URL_ALLELE_MATRIX_STATUS = "allelematrix-search/status";
     static public final String URL_GERMPLASM_DETAILS = "germplasm/{germplasmDbId}";
     static public final String URL_GERMPLASM_SEARCH = "germplasm-search";
+    static public final String URL_GERMPLASM_ATTRIBUTES = "germplasm/{germplasmDbId}/attributes";
 
 //	static public final String URL_STUDY_GERMPLASMS_V1_0 = "studies/{id}/germplasm";
 //	static public final String URL_MAP_DETAILS_V1_0 = URL_MAPS + "/{id}";
@@ -296,6 +297,13 @@ public class BrapiRestController implements ServletContextAware {
     	implementedCalls.add(call);
     	
     	call = new CallMap();
+    	call.put("call", URL_GERMPLASM_SEARCH_GET_V1_3);
+    	call.put("dataTypes", Arrays.asList(new String[] {"application/json"}));
+    	call.put("methods", new String[] {"GET"});
+    	call.put("versions", new String[] {"1.3"});
+    	implementedCalls.add(call);
+
+    	call = new CallMap();
     	call.put("call", URL_GERMPLASM_SEARCH);
     	call.put("dataTypes", Arrays.asList(new String[] {"application/json"}));
     	call.put("methods", new String[] {"POST"});
@@ -389,7 +397,7 @@ public class BrapiRestController implements ServletContextAware {
 		}
 
     	Map<String, Object> resultObject = new LinkedHashMap<String, Object>();
-    	resultObject.put("version", "1.1");
+    	resultObject.put("version", "1.1, 1.3");
     	resultObject.put("provider", "Gigwa - Genotype Investigator for Genome-Wide Analyses");
         String taxon = MongoTemplateManager.getTaxonName(database);
         String species = MongoTemplateManager.getSpecies(database);
@@ -772,6 +780,12 @@ public class BrapiRestController implements ServletContextAware {
     	}
 
     	return executeGermplasmSearch(request, response, database, requestBody);
+    }
+
+    @CrossOrigin
+	@RequestMapping(value = "/{database:.+}" + URL_BASE_PREFIX + "/" + URL_GERMPLASM_SEARCH_GET_V1_3, method = RequestMethod.GET, produces = "application/json")
+	public Map<String, Object> germplasmSearchGetV1_3(HttpServletRequest request, HttpServletResponse response, @PathVariable String database, @RequestParam(required = false) String germplasmDbId, @RequestParam(required = false) String germplasmName, @RequestParam(required = false) Integer pageSize, @RequestParam(required = false) Integer page) throws Exception {
+    	return germplasmSearch(request, response, database, null, germplasmDbId, germplasmName, pageSize, page);
     }
 
     @CrossOrigin
