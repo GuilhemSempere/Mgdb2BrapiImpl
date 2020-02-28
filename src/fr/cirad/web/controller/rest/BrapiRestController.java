@@ -83,6 +83,7 @@ import com.mongodb.BasicDBObject;
 import com.mongodb.DBCursor;
 import com.mongodb.DBObject;
 
+import fr.cirad.io.brapi.BrapiService;
 import fr.cirad.mgdb.exporting.IExportHandler;
 import fr.cirad.mgdb.model.mongo.maintypes.GenotypingProject;
 import fr.cirad.mgdb.model.mongo.maintypes.GenotypingSample;
@@ -682,7 +683,7 @@ public class BrapiRestController implements ServletContextAware {
 			for (String individual : MgdbDao.getProjectIndividuals(database, gp.getId()))
 			{
 				Map<String, Object> germplasm = new HashMap<>();
-				germplasm.put("germplasmDbId", individual);
+				germplasm.put(BrapiService.BRAPI_FIELD_germplasmDbId, individual);
 				germplasm.put("germplasmName", individual);
 				germplasm.put("studyDbId", studyDbId);
 				data.add(germplasm);
@@ -711,7 +712,7 @@ public class BrapiRestController implements ServletContextAware {
 
     @CrossOrigin
 	@RequestMapping(value = "/{database:.+}" + URL_BASE_PREFIX + "/" + URL_GERMPLASM_ATTRIBUTES, method = RequestMethod.GET, produces = "application/json")
-	public Map<String, Object> germplasmAttributes(HttpServletRequest request, HttpServletResponse response, @PathVariable String database, @PathVariable("germplasmDbId") String germplasmDbId, @RequestParam(required = false) Integer pageSize, @RequestParam(required = false) Integer page) throws IOException, ObjectNotFoundException {
+	public Map<String, Object> germplasmAttributes(HttpServletRequest request, HttpServletResponse response, @PathVariable String database, @PathVariable(BrapiService.BRAPI_FIELD_germplasmDbId) String germplasmDbId, @RequestParam(required = false) Integer pageSize, @RequestParam(required = false) Integer page) throws IOException, ObjectNotFoundException {
     	MongoTemplate mongoTemplate = MongoTemplateManager.get(database);
 		if (mongoTemplate == null)
 		{
@@ -738,6 +739,7 @@ public class BrapiRestController implements ServletContextAware {
 			data.add(new HashMap<String, Object>() {{ put("attributeDbId", attributeDbId); put("value", ind.getAdditionalInfo().get(attributeDbId)); }});
 
     	result.put("data", data);
+    	result.put(BrapiService.BRAPI_FIELD_germplasmDbId, germplasmDbId);
 
     	Map<String, Object> resultObject = getStandardResponse(0, 1, data.size(), 0, false);
     	resultObject.put("result", result);
@@ -837,7 +839,7 @@ public class BrapiRestController implements ServletContextAware {
     	{
     		DBObject ind = dbCursor.next();
 			Map<String, Object> germplasm = new HashMap<>();
-			germplasm.put("germplasmDbId", ind.get("_id"));
+			germplasm.put(BrapiService.BRAPI_FIELD_germplasmDbId, ind.get("_id"));
 			germplasm.put("germplasmName", ind.get("_id"));
 			
 			HashMap<String, Comparable> additionalInfo = (HashMap<String, Comparable>) ind.get(Individual.SECTION_ADDITIONAL_INFO);
@@ -858,7 +860,7 @@ public class BrapiRestController implements ServletContextAware {
     
     @CrossOrigin
 	@RequestMapping(value = "/{database:.+}" + URL_BASE_PREFIX + "/" + URL_GERMPLASM_DETAILS, method = RequestMethod.GET, produces = "application/json")
-	public Map<String, Object> germplasmDetails(HttpServletRequest request, HttpServletResponse response, @PathVariable String database, @PathVariable("germplasmDbId") String germplasmDbId, @RequestParam(required = false) Integer pageSize, @RequestParam(required = false) Integer page) throws IOException, ObjectNotFoundException {
+	public Map<String, Object> germplasmDetails(HttpServletRequest request, HttpServletResponse response, @PathVariable String database, @PathVariable(BrapiService.BRAPI_FIELD_germplasmDbId) String germplasmDbId, @RequestParam(required = false) Integer pageSize, @RequestParam(required = false) Integer page) throws IOException, ObjectNotFoundException {
     	Map<String, Object> resultObject = getStandardResponse(0, 0, 0, 0, false);
     	
     	Map<String, Object> resultList = germplasmSearch(request, response, database, null, germplasmDbId, null, pageSize, page);
@@ -876,7 +878,7 @@ public class BrapiRestController implements ServletContextAware {
 
     @CrossOrigin
 	@RequestMapping(value = "/{database:.+}" + URL_BASE_PREFIX + "/" + URL_MARKER_PROFILES, method = RequestMethod.GET, produces = "application/json")
-	public Map<String, Object> markerProfiles(HttpServletRequest request, HttpServletResponse response, @PathVariable String database, @RequestParam(required = false, name="germplasmDbId") Collection<String> germplasmDbIds,
+	public Map<String, Object> markerProfiles(HttpServletRequest request, HttpServletResponse response, @PathVariable String database, @RequestParam(required = false, name=BrapiService.BRAPI_FIELD_germplasmDbId) Collection<String> germplasmDbIds,
 			@RequestParam(required = false, name="studyDbId") Integer studyDbId,
 			@RequestParam(required = false) Integer pageSize, @RequestParam(required = false) Integer page) throws Exception {
 		/*TODO: implement pagination*/
@@ -912,7 +914,7 @@ public class BrapiRestController implements ServletContextAware {
 				String germplasmId = sample.getIndividual();
 				markerProfile.put("markerprofileDbId", sample.getId().toString());
 				markerProfile.put("uniqueDisplayName", sample.getId().toString());
-				markerProfile.put("germplasmDbId", germplasmId);
+				markerProfile.put(BrapiService.BRAPI_FIELD_germplasmDbId, germplasmId);
 				markerProfile.put("sampleDbId", "" + sample.getId());
 				markerProfile.put("analysisMethod", gp.getTechnology());
 				markerProfile.put("extractDbId", "");
