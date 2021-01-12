@@ -86,6 +86,7 @@ import com.mongodb.client.MongoCursor;
 
 import fr.cirad.io.brapi.BrapiService;
 import fr.cirad.mgdb.exporting.IExportHandler;
+import fr.cirad.mgdb.model.mongo.maintypes.Database;
 import fr.cirad.mgdb.model.mongo.maintypes.GenotypingProject;
 import fr.cirad.mgdb.model.mongo.maintypes.GenotypingSample;
 import fr.cirad.mgdb.model.mongo.maintypes.Individual;
@@ -393,7 +394,7 @@ public class BrapiRestController implements ServletContextAware {
 
     @CrossOrigin
 	@RequestMapping(value = "/{database:.+}" + URL_BASE_PREFIX, method = RequestMethod.GET, produces = "application/json")
-    public Map<String, Object> home(HttpServletResponse response, @PathVariable String database)
+    public Map<String, Object> home(HttpServletResponse response, @PathVariable("database") String database)
     {
 		MongoTemplate mongoTemplate = MongoTemplateManager.get(database);
 		if (mongoTemplate == null)
@@ -405,9 +406,8 @@ public class BrapiRestController implements ServletContextAware {
     	Map<String, Object> resultObject = new LinkedHashMap<String, Object>();
     	resultObject.put("version", "1.1, 1.3");
     	resultObject.put("provider", "Gigwa - Genotype Investigator for Genome-Wide Analyses");
-        String taxon = MongoTemplateManager.getTaxonName(database);
-        String species = MongoTemplateManager.getSpecies(database);
-        String taxoDesc = (species != null ? "Species: " + species : "") + (taxon != null && !taxon.equals(species) ? (species != null ? " ; " : "") + "Taxon: " + taxon : "");
+        Database db = MongoTemplateManager.getCommonsTemplate().findById(database, Database.class);
+        String taxoDesc = db.getTaxon() != null ? (db.getSpecies() != null ? "Species: " + db.getSpecies() : "") + (db.getTaxon() != null && !db.getTaxon().equals(db.getSpecies()) ? "" : (db.getSpecies() != null ? " ; " : "") + "Taxon: " + db.getTaxon()) : "";
     	resultObject.put("description", "Database: " + database + " ; " + (!taxoDesc.isEmpty() ? taxoDesc + " ; " : "") + Helper.estimDocCount(mongoTemplate, Individual.class) + " germplasms ; " + Helper.estimDocCount(mongoTemplate,VariantData.class) + " markers");
     	resultObject.put("contact", "gigwa@cirad.fr");
     	return resultObject;
