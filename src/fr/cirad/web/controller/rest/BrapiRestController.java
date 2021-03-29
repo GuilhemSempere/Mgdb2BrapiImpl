@@ -850,7 +850,7 @@ public class BrapiRestController implements ServletContextAware {
 			germplasm.put(BrapiService.BRAPI_FIELD_germplasmDbId, ind.get("_id"));
 			germplasm.put("germplasmName", ind.get("_id"));
 			
-			HashMap<String, Comparable> additionalInfo = (HashMap<String, Comparable>) ind.get(Individual.SECTION_ADDITIONAL_INFO);
+			Document additionalInfo = (Document) ind.get(Individual.SECTION_ADDITIONAL_INFO);
 			if (additionalInfo != null)
 				for (String key : additionalInfo.keySet())
 				{
