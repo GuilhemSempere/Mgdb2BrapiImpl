@@ -1039,8 +1039,6 @@ public class BrapiRestController implements ServletContextAware {
     @RequestMapping(value = "/{database:.+}" + URL_BASE_PREFIX + "/" + URL_MARKER_DETAILS, method = {RequestMethod.GET}, produces = "application/json")
     public Map<String, Object> markerDetails(HttpServletRequest request, HttpServletResponse response, @PathVariable String database, @PathVariable("markerDbId") String markerDbId) throws ObjectNotFoundException, Exception
 	{
-    	long before = System.currentTimeMillis();
-
     	MongoTemplate mongoTemplate = MongoTemplateManager.get(database);
 		if (mongoTemplate == null)
 		{
@@ -1064,9 +1062,10 @@ public class BrapiRestController implements ServletContextAware {
 	    		variantDTO.put("defaultDisplayName", defaultDisplayName);
 	    		variantDTO.put("analysisMethods", null);
 	    		HashSet<String> synonymsObject = new HashSet<String>();
-	    		for (String synType : variant.getSynonyms().keySet())
-	    			for (String synForType : (Collection<String>) variant.getSynonyms().get(synType))
-	    				synonymsObject.add(synForType.toString());
+	    		if (variant.getSynonyms() != null)
+		    		for (String synType : variant.getSynonyms().keySet())
+		    			for (String synForType : (Collection<String>) variant.getSynonyms().get(synType))
+		    				synonymsObject.add(synForType.toString());
 	    		variantDTO.put("synonyms", synonymsObject);
 	        	resultObject.put("result", variantDTO);
 			}
@@ -1191,8 +1190,7 @@ public class BrapiRestController implements ServletContextAware {
 					ProgressIndicator progress = new ProgressIndicator(extractId, new String[] {"Generating export file"});
 					ProgressIndicator.registerProgressIndicator(progress);
 					
-			    	Number avgObjSize = (Number) mongoTemplate.getDb().runCommand(new Document("collStats", mongoTemplate.getCollectionName(VariantRunData.class))).get("avgObjSize");
-			        int nChunkIndex = 0, nChunkSize = (int) (IExportHandler.nMaxChunkSizeInMb * 1024 * 1024 / avgObjSize.doubleValue());
+			        int nChunkIndex = 0, nChunkSize = IExportHandler.computeQueryChunkSize(mongoTemplate, finalMarkerList.size());
 			        
 					FileWriter fw = null;
 					try
