@@ -690,7 +690,7 @@ public class BrapiRestController implements ServletContextAware {
 			for (String individual : MgdbDao.getProjectIndividuals(database, gp.getId()))
 			{
 				Map<String, Object> germplasm = new HashMap<>();
-				germplasm.put(BrapiService.BRAPI_FIELD_germplasmExternalReferenceId, individual);
+				germplasm.put(BrapiService.BRAPI_FIELD_germplasmDbId, individual);
 				germplasm.put("germplasmName", individual);
 				germplasm.put("studyDbId", studyDbId);
 				data.add(germplasm);
@@ -719,7 +719,7 @@ public class BrapiRestController implements ServletContextAware {
 
     @CrossOrigin
 	@RequestMapping(value = "/{database:.+}" + URL_BASE_PREFIX + "/" + URL_GERMPLASM_ATTRIBUTES, method = RequestMethod.GET, produces = "application/json")
-	public Map<String, Object> germplasmAttributes(HttpServletRequest request, HttpServletResponse response, @PathVariable String database, @PathVariable(BrapiService.BRAPI_FIELD_germplasmExternalReferenceId) String germplasmDbId, @RequestParam(required = false) Integer pageSize, @RequestParam(required = false) Integer page) throws IOException, ObjectNotFoundException {
+	public Map<String, Object> germplasmAttributes(HttpServletRequest request, HttpServletResponse response, @PathVariable String database, @PathVariable String germplasmDbId, @RequestParam(required = false) Integer pageSize, @RequestParam(required = false) Integer page) throws IOException, ObjectNotFoundException {
     	MongoTemplate mongoTemplate = MongoTemplateManager.get(database);
 		if (mongoTemplate == null)
 		{
@@ -746,7 +746,7 @@ public class BrapiRestController implements ServletContextAware {
 			data.add(new HashMap<String, Object>() {{ put("attributeDbId", attributeDbId); put("value", ind.getAdditionalInfo().get(attributeDbId)); }});
 
     	result.put("data", data);
-    	result.put(BrapiService.BRAPI_FIELD_germplasmExternalReferenceId, germplasmDbId);
+    	result.put(BrapiService.BRAPI_FIELD_germplasmDbId, germplasmDbId);
 
     	Map<String, Object> resultObject = getStandardResponse(0, 1, data.size(), 0, false);
     	resultObject.put("result", result);
@@ -847,7 +847,7 @@ public class BrapiRestController implements ServletContextAware {
     	{
     		Document ind = dbCursor.next();
 			Map<String, Object> germplasm = new HashMap<>();
-			germplasm.put(BrapiService.BRAPI_FIELD_germplasmExternalReferenceId, ind.get("_id"));
+			germplasm.put(BrapiService.BRAPI_FIELD_germplasmDbId, ind.get("_id"));
 			germplasm.put("germplasmName", ind.get("_id"));
 			
 			Document additionalInfo = (Document) ind.get(Individual.SECTION_ADDITIONAL_INFO);
@@ -922,7 +922,7 @@ public class BrapiRestController implements ServletContextAware {
 				String germplasmId = sample.getIndividual();
 				markerProfile.put("markerprofileDbId", sample.getId().toString());
 				markerProfile.put("uniqueDisplayName", sample.getId().toString());
-				markerProfile.put(BrapiService.BRAPI_FIELD_germplasmExternalReferenceId, germplasmId);
+				markerProfile.put(BrapiService.BRAPI_FIELD_germplasmDbId, germplasmId);
 				markerProfile.put("sampleDbId", "" + sample.getId());
 				markerProfile.put("analysisMethod", gp.getTechnology());
 				markerProfile.put("extractDbId", "");
