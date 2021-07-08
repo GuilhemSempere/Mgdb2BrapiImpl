@@ -19,17 +19,12 @@ package fr.cirad.web.controller.rest;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.net.InetAddress;
-import java.net.NetworkInterface;
-import java.net.SocketException;
 import java.net.URLDecoder;
-import java.net.UnknownHostException;
 import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Date;
-import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -80,7 +75,6 @@ import org.springframework.web.context.ServletContextAware;
 import org.springframework.web.servlet.ModelAndView;
 import org.springframework.web.servlet.view.json.MappingJackson2JsonView;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.mongodb.client.FindIterable;
 import com.mongodb.client.MongoCursor;
 
@@ -102,7 +96,10 @@ import fr.cirad.tools.ProgressIndicator;
 import fr.cirad.tools.mongo.MongoTemplateManager;
 import fr.cirad.tools.security.base.AbstractTokenManager;
 import fr.cirad.web.controller.BackOfficeController;
+
 import io.swagger.annotations.ApiOperation;
+import io.swagger.annotations.Authorization;
+
 import jhi.brapi.api.Metadata;
 import jhi.brapi.api.Pagination;
 import jhi.brapi.api.Status;
@@ -391,6 +388,7 @@ public class BrapiRestController implements ServletContextAware {
     	return resultObject;
     }
 
+    @ApiOperation(authorizations = { @Authorization(value = "AuthorizationToken") }, value = "home")
     @CrossOrigin
 	@RequestMapping(value = "/{database:.+}" + URL_BASE_PREFIX, method = RequestMethod.GET, produces = "application/json")
     public Map<String, Object> home(HttpServletResponse response, @PathVariable String database)
@@ -413,6 +411,7 @@ public class BrapiRestController implements ServletContextAware {
     	return resultObject;
     }
 
+    @ApiOperation(authorizations = { @Authorization(value = "AuthorizationToken") }, value = "calls")
     @CrossOrigin
 	@RequestMapping(value = "/{database:.+}" + URL_BASE_PREFIX + "/" + URL_CALLS, method = RequestMethod.GET, produces = "application/json")
     public Map<String, Object> calls(HttpServletResponse response, @PathVariable String database, @RequestParam(required = false) String datatype, @RequestParam(required = false) Integer pageSize, @RequestParam(required = false) Integer page)
@@ -438,18 +437,13 @@ public class BrapiRestController implements ServletContextAware {
     	return resultObject;
     }
     
+    @ApiOperation(authorizations = { @Authorization(value = "AuthorizationToken") }, value = "mapList")
     @CrossOrigin
 	@RequestMapping(value = "/{database:.+}" + URL_BASE_PREFIX + "/" + URL_MAPS, method = RequestMethod.GET, produces = "application/json")
 	public Map<String, Object> mapList(HttpServletRequest request, HttpServletResponse response, @PathVariable String database, @RequestParam(required = false, name="species") String speciesId,
 			@RequestParam(required = false) Integer pageSize, @RequestParam(required = false) Integer page) throws IOException {
 		MongoTemplate mongoTemplate = MongoTemplateManager.get(database);
-//		if (mongoTemplate == null)
-//		{
-//			response.setStatus(HttpServletResponse.SC_NOT_FOUND);
-//			return null;
-//		}
-//		LOG.debug("mapList called");
-		
+
 		ArrayList<Map<String, Object>> data = new ArrayList<>();
 		if (speciesId == null || speciesId.equals(MongoTemplateManager.getTaxonName(database)))
 			try 
@@ -479,6 +473,7 @@ public class BrapiRestController implements ServletContextAware {
     	return resultObject;
 	}
    
+    @ApiOperation(authorizations = { @Authorization(value = "AuthorizationToken") }, value = "mapDetails")
     @CrossOrigin
 	@RequestMapping(value = "/{database:.+}" + URL_BASE_PREFIX + "/" + URL_MAP_DETAILS, method = RequestMethod.GET, produces = "application/json")
 	public Map<String, Object> mapDetails(HttpServletRequest request, HttpServletResponse response, @PathVariable String database, @PathVariable("mapDbId") String mapDbId, @RequestParam(required = false) Integer pageSize, @RequestParam(required = false) Integer page) throws IOException {
@@ -534,16 +529,11 @@ public class BrapiRestController implements ServletContextAware {
     	return resultObject;
 	}
     
+    @ApiOperation(authorizations = { @Authorization(value = "AuthorizationToken") }, value = "mapMarkerPositions")
     @CrossOrigin
 	@RequestMapping(value = "/{database:.+}" + URL_BASE_PREFIX + "/" + URL_MAP_POSITIONS, method = RequestMethod.GET, produces = "application/json")
 	public Map<String, Object> mapMarkerPositions(HttpServletRequest request, HttpServletResponse response, @PathVariable final String database, @PathVariable String mapDbId, @RequestParam(required = false, name="linkageGroupName") Collection<String> linkageGroupNames, @RequestParam(required = false) Integer pageSize, @RequestParam(required = false) Integer page) throws IOException {
 		MongoTemplate mongoTemplate = MongoTemplateManager.get(mapDbId);
-//		if (mongoTemplate == null)
-//		{
-//			response.setStatus(HttpServletResponse.SC_NOT_FOUND);
-//			return null;
-//		}
-//		LOG.debug("mapMarkers called");
 		long before = System.currentTimeMillis();
 		ArrayList<Map<String, Object>> data = new ArrayList<>();
 		long nCount = 0;
@@ -632,8 +622,9 @@ public class BrapiRestController implements ServletContextAware {
     	return resultObject;
 	}
 
+    @ApiOperation(authorizations = { @Authorization(value = "AuthorizationToken") }, value = "studySummaryList")
     @CrossOrigin
-	@RequestMapping(value = {"/{database:.+}" + URL_BASE_PREFIX + "/" + URL_STUDIES, "/{database:.+}" + URL_BASE_PREFIX + "/" + URL_STUDIES_V1_3}, method = RequestMethod.GET, produces = "application/json")
+	@RequestMapping(value = { "/{database:.+}" + URL_BASE_PREFIX + "/" + URL_STUDIES, "/{database:.+}" + URL_BASE_PREFIX + "/" + URL_STUDIES_V1_3}, method = RequestMethod.GET, produces = "application/json")
 	public Map<String, Object> studySummaryList(HttpServletRequest request, HttpServletResponse response, @PathVariable String database, @RequestParam(required = false) String studyType,
 			@RequestParam(required = false) Integer pageSize, @RequestParam(required = false) Integer page) {
 		MongoTemplate mongoTemplate = MongoTemplateManager.get(database);
@@ -672,6 +663,7 @@ public class BrapiRestController implements ServletContextAware {
 	    return resultObject;
 	}
     
+    @ApiOperation(authorizations = { @Authorization(value = "AuthorizationToken") }, value = "studyGerplasmList")
     @CrossOrigin
 	@RequestMapping(value = "/{database:.+}" + URL_BASE_PREFIX + "/" + URL_STUDY_GERMPLASMS, method = RequestMethod.GET, produces = "application/json")
 	public Map<String, Object> studyGerplasmList(HttpServletRequest request, HttpServletResponse response, @PathVariable String database, @PathVariable(value="studyDbId") int studyDbId, @RequestParam(required = false) Integer pageSize, @RequestParam(required = false) Integer page) {
@@ -717,6 +709,7 @@ public class BrapiRestController implements ServletContextAware {
     	public Integer page;
     }
 
+    @ApiOperation(authorizations = { @Authorization(value = "AuthorizationToken") }, value = "germplasmAttributes")
     @CrossOrigin
 	@RequestMapping(value = "/{database:.+}" + URL_BASE_PREFIX + "/" + URL_GERMPLASM_ATTRIBUTES, method = RequestMethod.GET, produces = "application/json")
 	public Map<String, Object> germplasmAttributes(HttpServletRequest request, HttpServletResponse response, @PathVariable String database, @PathVariable String germplasmDbId, @RequestParam(required = false) Integer pageSize, @RequestParam(required = false) Integer page) throws IOException, ObjectNotFoundException {
@@ -753,8 +746,9 @@ public class BrapiRestController implements ServletContextAware {
     	return resultObject;
     }
 
+    @ApiOperation(authorizations = { @Authorization(value = "AuthorizationToken") }, value = "germplasmSearch")
     @CrossOrigin
-	@RequestMapping(value = {"/{database:.+}" + URL_BASE_PREFIX + "/" + URL_GERMPLASM_SEARCH_V1_3, "/{database:.+}" + URL_BASE_PREFIX + "/" + URL_GERMPLASM_SEARCH}, method = RequestMethod.POST, consumes = "application/json", produces = "application/json")
+	@RequestMapping(value = { "/{database:.+}" + URL_BASE_PREFIX + "/" + URL_GERMPLASM_SEARCH_V1_3, "/{database:.+}" + URL_BASE_PREFIX + "/" + URL_GERMPLASM_SEARCH}, method = RequestMethod.POST, consumes = "application/json", produces = "application/json")
 	public Map<String, Object> germplasmSearch(HttpServletRequest request, HttpServletResponse response, @PathVariable String database, @RequestBody GermplasmSearchRequest requestBody) throws ObjectNotFoundException {
     	MongoTemplate mongoTemplate = MongoTemplateManager.get(database);
 		if (mongoTemplate == null)
@@ -778,6 +772,7 @@ public class BrapiRestController implements ServletContextAware {
 	    return resultObject;
 	}
     
+    @ApiOperation(authorizations = { @Authorization(value = "AuthorizationToken") }, value = "getGermplasmSearchResults")
     @CrossOrigin
 	@RequestMapping(value = "/{database:.+}" + URL_BASE_PREFIX + "/" + URL_GERMPLASM_SEARCH_RESULT_V1_3, method = RequestMethod.GET, produces = "application/json")
     public Map<String, Object> getGermplasmSearchResults(HttpServletRequest request, HttpServletResponse response, @PathVariable String database, @PathVariable("searchResultsDbId") String searchResultsDbId) throws ObjectNotFoundException, IOException {
@@ -791,12 +786,14 @@ public class BrapiRestController implements ServletContextAware {
     	return executeGermplasmSearch(request, response, database, requestBody);
     }
 
+    @ApiOperation(authorizations = { @Authorization(value = "AuthorizationToken") }, value = "germplasmSearchGetV1_3")
     @CrossOrigin
 	@RequestMapping(value = "/{database:.+}" + URL_BASE_PREFIX + "/" + URL_GERMPLASM_SEARCH_GET_V1_3, method = RequestMethod.GET, produces = "application/json")
 	public Map<String, Object> germplasmSearchGetV1_3(HttpServletRequest request, HttpServletResponse response, @PathVariable String database, @RequestParam(required = false) String germplasmDbId, @RequestParam(required = false) String germplasmName, @RequestParam(required = false) Integer pageSize, @RequestParam(required = false) Integer page) throws Exception {
     	return germplasmSearch(request, response, database, null, germplasmDbId, germplasmName, pageSize, page);
     }
 
+    @ApiOperation(authorizations = { @Authorization(value = "AuthorizationToken") }, value = "germplasmSearch")
     @CrossOrigin
 	@RequestMapping(value = "/{database:.+}" + URL_BASE_PREFIX + "/" + URL_GERMPLASM_SEARCH, method = RequestMethod.GET, produces = "application/json")
 	public Map<String, Object> germplasmSearch(HttpServletRequest request, HttpServletResponse response, @PathVariable String database, @RequestParam(required = false) String germplasmPUI, @RequestParam(required = false) String germplasmDbId, @RequestParam(required = false) String germplasmName, @RequestParam(required = false) Integer pageSize, @RequestParam(required = false) Integer page) throws ObjectNotFoundException, IOException {
@@ -866,6 +863,7 @@ public class BrapiRestController implements ServletContextAware {
 	    return resultObject;
     }
     
+    @ApiOperation(authorizations = { @Authorization(value = "AuthorizationToken") }, value = "germplasmDetails")
     @CrossOrigin
 	@RequestMapping(value = "/{database:.+}" + URL_BASE_PREFIX + "/" + URL_GERMPLASM_DETAILS, method = RequestMethod.GET, produces = "application/json")
 	public Map<String, Object> germplasmDetails(HttpServletRequest request, HttpServletResponse response, @PathVariable String database, @PathVariable(BrapiService.BRAPI_FIELD_germplasmExternalReferenceId) String germplasmDbId, @RequestParam(required = false) Integer pageSize, @RequestParam(required = false) Integer page) throws IOException, ObjectNotFoundException {
@@ -884,6 +882,7 @@ public class BrapiRestController implements ServletContextAware {
     	return resultObject;
     }
 
+    @ApiOperation(authorizations = { @Authorization(value = "AuthorizationToken") }, value = "markerProfiles")
     @CrossOrigin
 	@RequestMapping(value = "/{database:.+}" + URL_BASE_PREFIX + "/" + URL_MARKER_PROFILES, method = RequestMethod.GET, produces = "application/json")
 	public Map<String, Object> markerProfiles(HttpServletRequest request, HttpServletResponse response, @PathVariable String database, @RequestParam(required = false, name=BrapiService.BRAPI_FIELD_germplasmExternalReferenceId) Collection<String> germplasmDbIds,
@@ -941,8 +940,9 @@ public class BrapiRestController implements ServletContextAware {
     	return resultObject;
 	}
 
+    @ApiOperation(authorizations = { @Authorization(value = "AuthorizationToken") }, value = "markers")
     @CrossOrigin
-    @RequestMapping(value = {"/{database:.+}" + URL_BASE_PREFIX + "/" + URL_MARKERS_SEARCH, "/{database:.+}" + URL_BASE_PREFIX + "/" + URL_MARKERS_SEARCH_V1_0}, method = {RequestMethod.GET}, produces = "application/json")
+    @RequestMapping(value = { "/{database:.+}" + URL_BASE_PREFIX + "/" + URL_MARKERS_SEARCH, "/{database:.+}" + URL_BASE_PREFIX + "/" + URL_MARKERS_SEARCH_V1_0}, method = {RequestMethod.GET}, produces = "application/json")
     public Map<String, Object> markers(HttpServletRequest request, HttpServletResponse response, @PathVariable String database, @RequestParam(required = false) Collection<String> markerDbIds, @RequestParam(required = false) Collection<String> name, @RequestParam(required = false) String matchMethod, @RequestParam(required = false) String include, @RequestParam(required = false) String type, @RequestParam(required = false) Integer pageSize, @RequestParam(required = false) Integer page) throws ObjectNotFoundException, Exception
 	{
 //    	LOG.debug("markers called");
@@ -1035,6 +1035,7 @@ public class BrapiRestController implements ServletContextAware {
     	return resultObject;
 	}
     
+    @ApiOperation(authorizations = { @Authorization(value = "AuthorizationToken") }, value = "markerDetails")
     @CrossOrigin
     @RequestMapping(value = "/{database:.+}" + URL_BASE_PREFIX + "/" + URL_MARKER_DETAILS, method = {RequestMethod.GET}, produces = "application/json")
     public Map<String, Object> markerDetails(HttpServletRequest request, HttpServletResponse response, @PathVariable String database, @PathVariable("markerDbId") String markerDbId) throws ObjectNotFoundException, Exception
@@ -1083,8 +1084,9 @@ public class BrapiRestController implements ServletContextAware {
     	public Integer page;
     }
 
+    @ApiOperation(authorizations = { @Authorization(value = "AuthorizationToken") }, value = "markerDetails")
     @CrossOrigin
-    @RequestMapping(value = {"/{database:.+}" + URL_BASE_PREFIX + "/" + URL_MARKERS_SEARCH}, method = {RequestMethod.POST}, produces = "application/json")
+    @RequestMapping(value = { "/{database:.+}" + URL_BASE_PREFIX + "/" + URL_MARKERS_SEARCH}, method = {RequestMethod.POST}, produces = "application/json")
     public Map<String, Object> markers(HttpServletRequest request, HttpServletResponse response, @PathVariable String database, @RequestBody MarkerSearchRequest requestBody) throws ObjectNotFoundException, Exception 
     {
     	return markers(request, response, database, requestBody.markerDbIds, requestBody.name, requestBody.matchMethod, requestBody.include, requestBody.type, requestBody.pageSize, requestBody.page);
@@ -1126,6 +1128,7 @@ public class BrapiRestController implements ServletContextAware {
     	public Integer page;
     }
 
+    @ApiOperation(authorizations = { @Authorization(value = "AuthorizationToken") }, value = "alleleMatrix")
     @CrossOrigin
     @RequestMapping(method = RequestMethod.POST, value = "/{database:.+}" + URL_BASE_PREFIX + "/" + URL_ALLELE_MATRIX, consumes = "application/json", produces = "application/json")
     public Map<String, Object> alleleMatrix(HttpServletRequest request, HttpServletResponse response, @PathVariable String database, @RequestBody AlleleMatrixRequest requestBody) throws Exception
@@ -1133,6 +1136,7 @@ public class BrapiRestController implements ServletContextAware {
     	return alleleMatrix(request, response, database, requestBody.markerprofileDbId, requestBody.markerDbId, requestBody.unknownString, requestBody.sepUnphased, requestBody.sepPhased, requestBody.expandHomozygotes, requestBody.format, requestBody.pageSize, requestBody.page);
     }
 
+    @ApiOperation(authorizations = { @Authorization(value = "AuthorizationToken") }, value = "alleleMatrix")
     @CrossOrigin
     @RequestMapping(method = RequestMethod.GET, value = "/{database:.+}" + URL_BASE_PREFIX + "/" + URL_ALLELE_MATRIX, produces = "application/json")
     public Map<String, Object> alleleMatrix(HttpServletRequest request, HttpServletResponse response, @PathVariable String database, @RequestParam(name="markerprofileDbId") Collection<String> markerprofileDbIDs, @RequestParam(name="markerDbId", required = false) List<Object> markerDbIDs,
@@ -1319,6 +1323,7 @@ public class BrapiRestController implements ServletContextAware {
     	return resultObject;
     }
 
+    @ApiOperation(authorizations = { @Authorization(value = "AuthorizationToken") }, value = "alleleMatrixExportStatus")
     @CrossOrigin
     @RequestMapping(value = "/{database:.+}" + URL_BASE_PREFIX + "/" + URL_ALLELE_MATRIX_STATUS + "/{extractID}", method = RequestMethod.GET, produces = "application/json")
 	public Map<String, Object> alleleMatrixExportStatus(HttpServletRequest request, HttpServletResponse response, @PathVariable String database, @PathVariable String extractID) throws Exception
@@ -1362,7 +1367,7 @@ public class BrapiRestController implements ServletContextAware {
 		public String password;
 	}
 
-    @ApiOperation(value = "createToken", notes = "Generates a token using passed credentials")
+    @ApiOperation(authorizations = { @Authorization(value = "AuthorizationToken") }, value = "createToken", notes = "Generates a token using passed credentials")
     @CrossOrigin
 	@RequestMapping(value = {"/{database:.+}" + URL_BASE_PREFIX + "/" + URL_TOKEN, "/{database:.+}" + URL_BASE_PREFIX + "/" + URL_LOGIN_V1_3}, method = RequestMethod.POST, produces = "application/json"/*, consumes = "application/json"*/)
     public Map<String, Object> createToken(HttpServletRequest request, HttpServletResponse response, @PathVariable String database, @RequestBody CreateTokenRequestBody userCredentials) throws IllegalArgumentException, IOException
@@ -1415,6 +1420,7 @@ public class BrapiRestController implements ServletContextAware {
 		public String access_token;
 	}
 
+    @ApiOperation(authorizations = { @Authorization(value = "AuthorizationToken") }, value = "clearToken")
     @CrossOrigin
 	@RequestMapping(value = {"/{database:.+}" + URL_BASE_PREFIX + "/" + URL_TOKEN, "/{database:.+}" + URL_BASE_PREFIX + "/" + URL_LOGOUT_V1_3}, method = RequestMethod.DELETE, produces = "application/json")
     public Map<String, Object> clearToken(HttpServletRequest request, HttpServletResponse response, @PathVariable String database, @RequestBody(required=false) ClearTokenRequestBody bodyToken)
