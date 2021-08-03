@@ -830,30 +830,29 @@ public class BrapiRestController implements ServletContextAware {
 
     	MongoTemplate mongoTemplate = MongoTemplateManager.get(database);
 		Query q = indIDs.size() > 0 ? new Query(Criteria.where("_id").in(indIDs)) : new Query();
+		q.fields().include("_id");
         long count = mongoTemplate.count(q, Individual.class);
-		
-        FindIterable<Document> iterable = mongoTemplate.getCollection(mongoTemplate.getCollectionName(Individual.class)).find(indIDs.size() == 0 ? new Document() : q.getQueryObject());
+        		
         if (requestBody.pageSize != null)
         {
-        	iterable.limit(requestBody.pageSize);
+        	q.limit(requestBody.pageSize);
             if (requestBody.page != null)
-            	iterable.skip(requestBody.page * requestBody.pageSize);
+            	q.skip(requestBody.page * requestBody.pageSize);
         }
-        MongoCursor<Document> dbCursor = iterable.iterator();
-    	while (dbCursor.hasNext())
-    	{
-    		Document ind = dbCursor.next();
+        List<String> indIDsForCurrentPage = mongoTemplate.find(q, Individual.class).stream().map(ind -> ind.getId()).collect(Collectors.toList());
+
+		Authentication auth = tokenManager.getAuthenticationFromToken(tokenManager.readToken(request));
+    	String sCurrentUser = auth == null || "anonymousUser".equals(auth.getName()) ? "anonymousUser" : auth.getName();
+        for (Individual ind :  MgdbDao.loadIndividualsWithAllMetadata(database, sCurrentUser, null, indIDsForCurrentPage).values()) {
 			Map<String, Object> germplasm = new HashMap<>();
-			germplasm.put(BrapiService.BRAPI_FIELD_germplasmDbId, ind.get("_id"));
-			germplasm.put("germplasmName", ind.get("_id"));
+			germplasm.put(BrapiService.BRAPI_FIELD_germplasmDbId, ind.getId());
+			germplasm.put("germplasmName", ind.getId());
 			
-			Document additionalInfo = (Document) ind.get(Individual.SECTION_ADDITIONAL_INFO);
-			if (additionalInfo != null)
-				for (String key : additionalInfo.keySet())
-				{
+			if (ind.getAdditionalInfo() != null)
+				for (String key : ind.getAdditionalInfo().keySet()) {
 					String lcKey = CaseUtils.toCamelCase(key, false, '_', '-', '.').toLowerCase();
 					if (BrapiGermplasm.germplasmFields.containsKey(lcKey))
-						germplasm.put(BrapiGermplasm.germplasmFields.get(lcKey), additionalInfo.get(key));
+						germplasm.put(BrapiGermplasm.germplasmFields.get(lcKey), ind.getAdditionalInfo().get(key));
 				}
 			data.add(germplasm);
 		}
