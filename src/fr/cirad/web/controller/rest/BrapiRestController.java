@@ -167,7 +167,7 @@ public class BrapiRestController implements ServletContextAware {
 //	static public final String URL_MAP_DETAILS_V1_0 = URL_MAPS + "/{id}";
 //	static public final String URL_MAP_POSITIONS_V1_0 = URL_MAPS + "/{id}/positions";
     static public final String URL_MARKERS_SEARCH_V1_0 = "markers";
-    
+
     static private final TreeSet<CallMap> implementedCalls = new TreeSet<>();
     protected HashMap<String /*module*/, HashMap<Integer /*marker index when sorted by id*/, Comparable /*marker id*/>> markerIndexByModuleMap= new HashMap<>();
     
@@ -720,16 +720,23 @@ public class BrapiRestController implements ServletContextAware {
 			return null;
 		}
 
-		if (!tokenManager.canUserReadDB(tokenManager.readToken(request), database))
+		String token = tokenManager.readToken(request);
+    	Authentication authentication = tokenManager.getAuthenticationFromToken(token);
+    	if (authentication == null)
+    		authentication = SecurityContextHolder.getContext().getAuthentication();
+    	
+		if (!tokenManager.canUserReadDB(authentication, database))
 		{
 			response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
 			return null;
 		}
 
+    	if (authentication == null)
+    		authentication = SecurityContextHolder.getContext().getAuthentication();
+
     	HashMap<String, Object> result = new HashMap<>();
-		Individual ind = mongoTemplate.findOne(new Query(Criteria.where("_id").is(germplasmDbId)), Individual.class);
-    	if (ind == null)
-    	{
+    	Individual ind = MgdbDao.getInstance().loadIndividualsWithAllMetadata(database, authentication.getName(), null, Arrays.asList(germplasmDbId)).get(germplasmDbId);
+    	if (ind == null) {
     		build404Response(response);
     		return null;
     	}
@@ -843,7 +850,7 @@ public class BrapiRestController implements ServletContextAware {
 
 		Authentication auth = tokenManager.getAuthenticationFromToken(tokenManager.readToken(request));
     	String sCurrentUser = auth == null || "anonymousUser".equals(auth.getName()) ? "anonymousUser" : auth.getName();
-        for (Individual ind :  MgdbDao.loadIndividualsWithAllMetadata(database, sCurrentUser, null, indIDsForCurrentPage).values()) {
+        for (Individual ind : MgdbDao.getInstance().loadIndividualsWithAllMetadata(database, sCurrentUser, null, indIDsForCurrentPage).values()) {
 			Map<String, Object> germplasm = new HashMap<>();
 			germplasm.put(BrapiService.BRAPI_FIELD_germplasmDbId, ind.getId());
 			germplasm.put("germplasmName", ind.getId());
