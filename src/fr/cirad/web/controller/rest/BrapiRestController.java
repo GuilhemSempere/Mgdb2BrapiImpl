@@ -1018,7 +1018,7 @@ public class BrapiRestController implements ServletContextAware {
             Query q = crits.size() == 0 ? new Query() : new Query(new Criteria().andOperator(crits.toArray(new Criteria[crits.size()])));
             count = mongoTemplate.count(q, VariantData.class);
 
-            Document projectObject = new Document(VariantData.FIELDNAME_KNOWN_ALLELE_LIST, 1);
+            Document projectObject = new Document(VariantData.FIELDNAME_KNOWN_ALLELES, 1);
             projectObject.put(VariantData.FIELDNAME_TYPE, 1);
             projectObject.put(VariantData.FIELDNAME_REFERENCE_POSITION, 1);
             if ("synonyms".equals(include)) {
@@ -1043,7 +1043,7 @@ public class BrapiRestController implements ServletContextAware {
                 if (markerType != null) {
                     variantDTO.put("type", markerType);
                 }
-                variantDTO.put("refAlt", (List<String>) dbVariant.get(VariantData.FIELDNAME_KNOWN_ALLELE_LIST));
+                variantDTO.put("refAlt", (List<String>) dbVariant.get(VariantData.FIELDNAME_KNOWN_ALLELES));
                 String defaultDisplayName = MgdbDao.idLooksGenerated(dbId) ? null : dbId.toString();	// we don't invent names for ObjectIDs since we would not able to apply a filter on them 
                 variantDTO.put("defaultDisplayName", defaultDisplayName);
                 variantDTO.put("analysisMethods", null);
@@ -1088,7 +1088,7 @@ public class BrapiRestController implements ServletContextAware {
                 HashMap<String, Object> variantDTO = new HashMap<>();
                 variantDTO.put("markerDbId", markerDbId);
                 variantDTO.put("type", variant.getType());
-                variantDTO.put("refAlt", variant.getKnownAlleleList());
+                variantDTO.put("refAlt", variant.getKnownAlleles());
                 String defaultDisplayName = MgdbDao.idLooksGenerated(markerDbId) ? null : markerDbId;	// we don't invent names for generated IDs since we would not able to apply a filter on them 
                 variantDTO.put("defaultDisplayName", defaultDisplayName);
                 variantDTO.put("analysisMethods", null);
