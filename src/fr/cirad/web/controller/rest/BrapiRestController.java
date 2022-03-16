@@ -60,8 +60,9 @@ import org.springframework.data.mongodb.core.mapping.Field;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.CrossOrigin;
@@ -97,10 +98,8 @@ import fr.cirad.tools.ProgressIndicator;
 import fr.cirad.tools.mongo.MongoTemplateManager;
 import fr.cirad.tools.security.base.AbstractTokenManager;
 import fr.cirad.web.controller.BackOfficeController;
-
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.Authorization;
-
 import jhi.brapi.api.Metadata;
 import jhi.brapi.api.Pagination;
 import jhi.brapi.api.Status;
@@ -721,7 +720,7 @@ public class BrapiRestController implements ServletContextAware {
     @ApiOperation(authorizations = { @Authorization(value = "AuthorizationToken") }, value = "germplasmAttributes")
     @CrossOrigin
     @RequestMapping(value = "/{database:.+}" + URL_BASE_PREFIX + "/" + URL_GERMPLASM_ATTRIBUTES, method = RequestMethod.GET, produces = "application/json")
-    public Map<String, Object> germplasmAttributes(HttpServletRequest request, HttpServletResponse response, @PathVariable String database, @PathVariable String germplasmDbId, @RequestParam(required = false) Integer pageSize, @RequestParam(required = false) Integer page) throws IOException, ObjectNotFoundException {
+    public Map<String, Object> germplasmAttributes(HttpServletRequest request, HttpServletResponse response, @PathVariable String database, @PathVariable(name = "germplasmDbId") String germplasmDbId, @RequestParam(required = false) Integer pageSize, @RequestParam(required = false) Integer page) throws IOException, ObjectNotFoundException {
         MongoTemplate mongoTemplate = MongoTemplateManager.get(database);
         if (mongoTemplate == null) {
             response.setStatus(HttpServletResponse.SC_NOT_FOUND);
@@ -729,22 +728,14 @@ public class BrapiRestController implements ServletContextAware {
         }
 
         String token = tokenManager.readToken(request);
-        Authentication authentication = tokenManager.getAuthenticationFromToken(token);
-        if (authentication == null) {
-            authentication = SecurityContextHolder.getContext().getAuthentication();
-        }
-
-        if (!tokenManager.canUserReadDB(authentication, database)) {
+        if (!tokenManager.canUserReadDB(token, database)) {
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
             return null;
         }
 
-        if (authentication == null) {
-            authentication = SecurityContextHolder.getContext().getAuthentication();
-        }
-
+        Authentication authentication = tokenManager.getAuthenticationFromToken(token);
         HashMap<String, Object> result = new HashMap<>();
-        Individual ind = MgdbDao.getInstance().loadIndividualsWithAllMetadata(database, authentication.getName(), null, Arrays.asList(germplasmDbId)).get(germplasmDbId);
+        Individual ind = MgdbDao.getInstance().loadIndividualsWithAllMetadata(database, authentication == null ? "anonymousUser" : authentication.getName(), null, Arrays.asList(germplasmDbId)).get(germplasmDbId);
         if (ind == null) {
             build404Response(response);
             return null;
@@ -1176,6 +1167,13 @@ public class BrapiRestController implements ServletContextAware {
     public Map<String, Object> alleleMatrix(HttpServletRequest request, HttpServletResponse response, @PathVariable String database, @RequestParam(name = "markerprofileDbId") Collection<String> markerprofileDbIDs, @RequestParam(name = "markerDbId", required = false) List<Object> markerDbIDs,
             @RequestParam(required = false) String unknownString, @RequestParam(required = false) String sepUnphased, @RequestParam(required = false) String sepPhased, @RequestParam(required = false) Boolean expandHomozygotes,
             @RequestParam(required = false) String format, @RequestParam(required = false) Integer pageSize, @RequestParam(required = false) Integer page) throws Exception {
+
+        String token = tokenManager.readToken(request);
+        if (!tokenManager.canUserReadDB(token, database)) {
+            response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+            return null;
+        }
+
         MongoTemplate mongoTemplate = MongoTemplateManager.get(database);
         if (mongoTemplate == null) {
             response.setStatus(HttpServletResponse.SC_NOT_FOUND);
@@ -1188,7 +1186,6 @@ public class BrapiRestController implements ServletContextAware {
         ArrayList<ArrayList<String>> data = new ArrayList<>();
         Map<String, Object> resultObject;
 
-        String token = tokenManager.readToken(request);
         TreeSet<String> sortedMarkerprofileDbIDs = new TreeSet<String>(new AlphaNumericComparator<String>());
         sortedMarkerprofileDbIDs.addAll(markerprofileDbIDs);
         Collection<GenotypingSample> samples = mongoTemplate.find(new Query(Criteria.where("_id").in(sortedMarkerprofileDbIDs.stream().map(id -> Integer.parseInt(id)).collect(Collectors.toList()))), GenotypingSample.class);
@@ -1381,7 +1378,6 @@ public class BrapiRestController implements ServletContextAware {
     }
 
     static public class CreateTokenRequestBody {
-
         public String username;
         public String password;
     }
@@ -1390,44 +1386,49 @@ public class BrapiRestController implements ServletContextAware {
     @CrossOrigin
     @RequestMapping(value = {"/{database:.+}" + URL_BASE_PREFIX + "/" + URL_TOKEN, "/{database:.+}" + URL_BASE_PREFIX + "/" + URL_LOGIN_V1_3}, method = RequestMethod.POST, produces = "application/json"/*, consumes = "application/json"*/)
     public Map<String, Object> createToken(HttpServletRequest request, HttpServletResponse response, @PathVariable String database, @RequestBody CreateTokenRequestBody userCredentials) throws IllegalArgumentException, IOException {
-        /*FIXME: don't allow login if not in https*/
+        /* FIXME: don't allow login if not in https? */
         MongoTemplate mongoTemplate = MongoTemplateManager.get(database);
         if (mongoTemplate == null) {
             response.setStatus(HttpServletResponse.SC_NOT_FOUND);
             return null;
         }
+        
+        if (userCredentials.username == null || userCredentials.username.isEmpty() ||  userCredentials.password == null || userCredentials.password.isEmpty()) {
+            response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+            return null;
+        }
 
-        response.setStatus(HttpServletResponse.SC_CREATED);
         Map<String, Object> resultObject = getStandardResponse(0, 0, 0, 0, false);
 
         int maxInactiveIntervalInSeconds = request.getSession().getMaxInactiveInterval();
-        if (maxInactiveIntervalInSeconds > 0) {
+        if (maxInactiveIntervalInSeconds > 0)
             tokenManager.setSessionTimeoutInSeconds(maxInactiveIntervalInSeconds);
+
+        try
+        {
+            Authentication authentication = authenticationManager.authenticate((new UsernamePasswordAuthenticationToken(userCredentials.username, userCredentials.password)));
+            response.setStatus(HttpServletResponse.SC_CREATED);
+            LOG.info("Successful authentication for user " + userCredentials.username);
+            resultObject.put("access_token", tokenManager.generateToken(authentication));
+            resultObject.put("expires_in", tokenManager.getSessionTimeoutInSeconds());
+            resultObject.put("userDisplayName", userCredentials.username);
+            return resultObject;
+        
         }
-        String token = tokenManager.createAndAttachToken(userCredentials.username, userCredentials.password);
-
-        Authentication authentication = null;
-        if (userCredentials.username != null && userCredentials.username.length() > 0) {
-            authentication = tokenManager.getAuthenticationFromToken(token);
-            SecurityContextHolder.getContext().setAuthentication(authentication);
-            repository.saveContext(SecurityContextHolder.getContext(), request, response);
-
-            if (authentication == null) {	// we don't return a token in case of a login failure
-                response.setStatus(HttpServletResponse.SC_FORBIDDEN);
-                return null;
+        catch (BadCredentialsException ignored)
+        {
+            LOG.info("Authentication failed for user " + userCredentials.username);
+            response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+            return null;
+        }
+        finally {
+            try {
+                tokenManager.cleanupTokenMap();
+            } catch (ParseException e) {
+                LOG.warn("Error executing cleanupTokenMap", e);
             }
-        }
 
-        try {
-            tokenManager.cleanupTokenMap();
-        } catch (ParseException e) {
-            LOG.warn("Error executing cleanupTokenMap", e);
         }
-
-        resultObject.put("expires_in", tokenManager.getSessionTimeoutInSeconds());
-        resultObject.put("access_token", token);
-        resultObject.put("userDisplayName", userCredentials.username);
-        return resultObject;
     }
 
     static public class ClearTokenRequestBody {
@@ -1455,8 +1456,8 @@ public class BrapiRestController implements ServletContextAware {
             return null;
         }
 
-        tokenManager.removeToken(token);
-        SecurityContextHolder.clearContext();	// make it unretrievable
+//        tokenManager.removeToken(token);
+//        SecurityContextHolder.clearContext();	// make it unretrievable
         Map<String, Object> resultObject = getStandardResponse(0, 0, 0, 0, false);
         Status status = new Status();
         status.setMessage("User has been logged out successfully.");
