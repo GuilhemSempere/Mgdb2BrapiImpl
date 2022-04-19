@@ -873,8 +873,7 @@ public class BrapiRestController implements ServletContextAware {
                     String lcKey = CaseUtils.toCamelCase(key, false, '_', '-', '.').toLowerCase();
                     if (brapiFields.containsKey(lcKey)) {
                         germplasm.put(brapiFields.get(lcKey), ind.getAdditionalInfo().get(key));
-                    }
-                    if (extRefList.contains(key)) {
+                    } else {
                         germplasm.put(key, ind.getAdditionalInfo().get(key));
                     }
                 }
