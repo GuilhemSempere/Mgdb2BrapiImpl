@@ -672,7 +672,7 @@ public class BrapiRestController implements ServletContextAware {
         @Authorization(value = "AuthorizationToken")}, value = "studyGerplasmList")
     @CrossOrigin
     @RequestMapping(value = "/{database:.+}" + URL_BASE_PREFIX + "/" + URL_STUDY_GERMPLASMS, method = RequestMethod.GET, produces = "application/json")
-    public Map<String, Object> studyGerplasmList(HttpServletRequest request, HttpServletResponse response, @PathVariable String database, @PathVariable(value = "studyDbId") int studyDbId, @RequestParam(required = false) Integer pageSize, @RequestParam(required = false) Integer page) {
+    public Map<String, Object> studyGerplasmList(HttpServletRequest request, HttpServletResponse response, @PathVariable String database, @PathVariable(value = "studyDbId") int studyDbId, @RequestParam(required = false) Integer pageSize, @RequestParam(required = false) Integer page) throws ObjectNotFoundException {
         MongoTemplate mongoTemplate = MongoTemplateManager.get(database);
         if (mongoTemplate == null) {
             response.setStatus(HttpServletResponse.SC_NOT_FOUND);
@@ -1259,7 +1259,7 @@ public class BrapiRestController implements ServletContextAware {
                                             previousPhasingIds.put(sample, currentPhId == null ? variantRunDataId.getVariantId() : currentPhId);
 
                                             String gtCode = sampleGenotype.getCode();
-                                            if (gtCode.length() == 0) {
+                                            if (gtCode == null || gtCode.length() == 0) {
                                                 fw.write("\t" + unknownGtCode);
                                             } else {
                                                 List<String> alleles = variants[i].getAllelesFromGenotypeCode(gtCode);
@@ -1318,7 +1318,7 @@ public class BrapiRestController implements ServletContextAware {
                             ArrayList<String> gtList = new ArrayList<String>();
                             gtList.add(variants[i].getId().toString());
                             gtList.add("" + sampleId);
-                            if (gtCode.length() == 0) {
+                            if (gtCode == null || gtCode.length() == 0) {
                                 gtList.add(unknownGtCode);
                             } else {
                                 List<String> alleles = variants[i].getAllelesFromGenotypeCode(gtCode);
