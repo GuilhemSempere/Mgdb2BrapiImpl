@@ -183,7 +183,7 @@ public class BrapiRestController implements ServletContextAware {
     static public final List<String> extRefList = new ArrayList<>();
 
     static {
-        extRefList.addAll(Arrays.asList(BrapiService.BRAPI_FIELD_germplasmExternalReferenceId, BrapiService.BRAPI_FIELD_germplasmExternalReferenceSource, BrapiService.BRAPI_FIELD_germplasmExternalReferenceType, BrapiService.BRAPI_FIELD_extGermplasmDbId));
+        extRefList.addAll(Arrays.asList(BrapiService.BRAPI_FIELD_germplasmExternalReferenceId, BrapiService.BRAPI_FIELD_germplasmExternalReferenceSource, BrapiService.BRAPI_FIELD_extGermplasmDbId));
     }
 
     static class CallMap extends HashMap<String, Object> implements Comparable<CallMap> {	// for auto-sorting by call URL
