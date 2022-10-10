@@ -32,8 +32,10 @@ import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.Timer;
 import java.util.TimerTask;
+import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -47,6 +49,7 @@ import org.apache.commons.collections.map.UnmodifiableMap;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.lang.exception.ExceptionUtils;
 import org.apache.commons.text.CaseUtils;
+import org.brapi.v2.model.GermplasmNewRequest;
 import org.bson.Document;
 import org.bson.types.ObjectId;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -63,7 +66,6 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -77,6 +79,7 @@ import org.springframework.web.context.ServletContextAware;
 import org.springframework.web.servlet.ModelAndView;
 import org.springframework.web.servlet.view.json.MappingJackson2JsonView;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.mongodb.client.FindIterable;
 import com.mongodb.client.MongoCursor;
 
@@ -130,14 +133,15 @@ public class BrapiRestController implements ServletContextAware {
 
     @Autowired
     private AbstractTokenManager tokenManager;
-    @Autowired
-    private SecurityContextRepository repository;
+
     @Autowired
     private AppConfig appConfig;
 
     @Autowired
     @Qualifier("authenticationManager")
-    AuthenticationManager authenticationManager;
+    static AuthenticationManager authenticationManager;
+    
+    public final Set<String> germplasmLevelFields = Arrays.stream(GermplasmNewRequest.class.getDeclaredFields()).filter(f -> f.isAnnotationPresent(JsonProperty.class)).map(f -> f.getName()).collect(Collectors.toSet());
 
     /**
      * The Constant EXPORT_FILE_EXPIRATION_DELAY_MILLIS.
@@ -669,7 +673,7 @@ public class BrapiRestController implements ServletContextAware {
     }
 
     @ApiOperation(authorizations = {
-        @Authorization(value = "AuthorizationToken")}, value = "studyGerplasmList")
+    @Authorization(value = "AuthorizationToken")}, value = "studyGerplasmList")
     @CrossOrigin
     @RequestMapping(value = "/{database:.+}" + URL_BASE_PREFIX + "/" + URL_STUDY_GERMPLASMS, method = RequestMethod.GET, produces = "application/json")
     public Map<String, Object> studyGerplasmList(HttpServletRequest request, HttpServletResponse response, @PathVariable String database, @PathVariable(value = "studyDbId") int studyDbId, @RequestParam(required = false) Integer pageSize, @RequestParam(required = false) Integer page) throws ObjectNotFoundException {
@@ -743,12 +747,11 @@ public class BrapiRestController implements ServletContextAware {
 
         ArrayList<Map<String, Object>> data = new ArrayList<>();
         for (String attributeDbId : ind.getAdditionalInfo().keySet()) {
-            data.add(new HashMap<String, Object>() {
-                {
+        	if (!germplasmLevelFields.contains(attributeDbId) && !BrapiService.BRAPI_FIELD_extGermplasmDbId.equals(attributeDbId))
+	            data.add(new HashMap<String, Object>() {{
                     put("attributeDbId", attributeDbId);
                     put("value", ind.getAdditionalInfo().get(attributeDbId));
-                }
-            });
+                }});
         }
 
         result.put("data", data);
@@ -864,19 +867,17 @@ public class BrapiRestController implements ServletContextAware {
         Authentication auth = tokenManager.getAuthenticationFromToken(tokenManager.readToken(request));
         String sCurrentUser = auth == null || "anonymousUser".equals(auth.getName()) ? "anonymousUser" : auth.getName();
         for (Individual ind : MgdbDao.getInstance().loadIndividualsWithAllMetadata(database, sCurrentUser, null, indIDsForCurrentPage).values()) {
-            Map<String, Object> germplasm = new HashMap<>();
+            Map<String, Object> germplasm = new TreeMap<>();
             germplasm.put(BrapiService.BRAPI_FIELD_germplasmDbId, ind.getId());
             germplasm.put("germplasmName", ind.getId());
 
             if (ind.getAdditionalInfo() != null) {
                 for (String key : ind.getAdditionalInfo().keySet()) {
                     String lcKey = CaseUtils.toCamelCase(key, false, '_', '-', '.').toLowerCase();
-                    if (brapiFields.containsKey(lcKey)) {
+                    if (brapiFields.containsKey(lcKey))
                         germplasm.put(brapiFields.get(lcKey), ind.getAdditionalInfo().get(key));
-                    }
-                    if (extRefList.contains(key)) {
-                        germplasm.put(key, ind.getAdditionalInfo().get(key));
-                    }
+//                    if (extRefList.contains(key))	// externalReferences is not part of the V1 model so we will only return this infoas germplasm attributes
+//                        germplasm.put(key, ind.getAdditionalInfo().get(key));
                 }
             }
 
@@ -891,7 +892,7 @@ public class BrapiRestController implements ServletContextAware {
     @ApiOperation(authorizations = { @Authorization(value = "AuthorizationToken") }, value = "germplasmDetails")
     @CrossOrigin
     @RequestMapping(value = "/{database:.+}" + URL_BASE_PREFIX + "/" + URL_GERMPLASM_DETAILS, method = RequestMethod.GET, produces = "application/json")
-    public Map<String, Object> germplasmDetails(HttpServletRequest request, HttpServletResponse response, @PathVariable String database, @PathVariable(BrapiService.BRAPI_FIELD_germplasmExternalReferenceId) String germplasmDbId, @RequestParam(required = false) Integer pageSize, @RequestParam(required = false) Integer page) throws IOException, ObjectNotFoundException {
+    public Map<String, Object> germplasmDetails(HttpServletRequest request, HttpServletResponse response, @PathVariable String database, @PathVariable(BrapiService.BRAPI_FIELD_germplasmDbId) String germplasmDbId, @RequestParam(required = false) Integer pageSize, @RequestParam(required = false) Integer page) throws IOException, ObjectNotFoundException {
         Map<String, Object> resultObject = getStandardResponse(0, 0, 0, 0, false);
 
         Map<String, Object> resultList = germplasmSearch(request, response, database, null, germplasmDbId, null, pageSize, page);
