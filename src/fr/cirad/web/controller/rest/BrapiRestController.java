@@ -138,7 +138,7 @@ public class BrapiRestController implements ServletContextAware {
 
     @Autowired
     @Qualifier("authenticationManager")
-    static AuthenticationManager authenticationManager;
+    private AuthenticationManager authenticationManager;
     
     public final Set<String> germplasmLevelFields = Arrays.stream(GermplasmNewRequest.class.getDeclaredFields()).filter(f -> f.isAnnotationPresent(JsonProperty.class)).map(f -> f.getName()).collect(Collectors.toSet());
 
@@ -1576,8 +1576,7 @@ public class BrapiRestController implements ServletContextAware {
 			tokenManager.setSessionTimeoutInSeconds(maxInactiveIntervalInSeconds);
 
 		try {
-			Authentication authentication = authenticationManager.authenticate(
-					(new UsernamePasswordAuthenticationToken(userCredentials.username, userCredentials.password)));
+			Authentication authentication = authenticationManager.authenticate((new UsernamePasswordAuthenticationToken(userCredentials.username, userCredentials.password)));
 			response.setStatus(HttpServletResponse.SC_CREATED);
 			LOG.info("Successful authentication for user " + userCredentials.username);
 			resultObject.put("access_token", tokenManager.generateToken(authentication));
