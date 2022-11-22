@@ -1546,16 +1546,9 @@ public class BrapiRestController implements ServletContextAware {
 		public String password;
 	}
 
-	@ApiOperation(authorizations = {
-			@Authorization(value = "AuthorizationToken") }, value = "createToken", notes = "Generates a token using passed credentials")
-	@RequestMapping(value = { "/{database:.+}" + URL_BASE_PREFIX + "/" + URL_TOKEN, "/{database:.+}" + URL_BASE_PREFIX
-			+ "/" + URL_LOGIN_V1_3 }, method = RequestMethod.POST, produces = "application/json"/*
-																								 * , consumes =
-																								 * "application/json"
-																								 */)
-	public Map<String, Object> createToken(HttpServletRequest request, HttpServletResponse response,
-			@PathVariable String database, @RequestBody CreateTokenRequestBody userCredentials)
-			throws IllegalArgumentException, IOException {
+	@ApiOperation(authorizations = { @Authorization(value = "AuthorizationToken") }, value = "createToken", notes = "Generates a token using passed credentials")
+	@RequestMapping(value = { "/{database:.+}" + URL_BASE_PREFIX + "/" + URL_TOKEN, "/{database:.+}" + URL_BASE_PREFIX+ "/" + URL_LOGIN_V1_3 }, method = RequestMethod.POST, produces = "application/json")
+	public Map<String, Object> createToken(HttpServletRequest request, HttpServletResponse response, @PathVariable String database, @RequestBody CreateTokenRequestBody userCredentials) throws IllegalArgumentException, IOException {
 		/* FIXME: don't allow login if not in https? */
 		MongoTemplate mongoTemplate = MongoTemplateManager.get(database);
 		if (mongoTemplate == null) {
@@ -1563,8 +1556,7 @@ public class BrapiRestController implements ServletContextAware {
 			return null;
 		}
 
-		if (userCredentials.username == null || userCredentials.username.isEmpty() || userCredentials.password == null
-				|| userCredentials.password.isEmpty()) {
+		if (userCredentials.username == null || userCredentials.username.isEmpty() || userCredentials.password == null || userCredentials.password.isEmpty()) {
 			response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
 			return null;
 		}
@@ -1583,31 +1575,22 @@ public class BrapiRestController implements ServletContextAware {
 			resultObject.put("expires_in", tokenManager.getSessionTimeoutInSeconds());
 			resultObject.put("userDisplayName", userCredentials.username);
 			return resultObject;
-
 		} catch (BadCredentialsException ignored) {
 			LOG.info("Authentication failed for user " + userCredentials.username);
 			response.setStatus(HttpServletResponse.SC_FORBIDDEN);
 			return null;
 		} finally {
-			try {
-				tokenManager.cleanupTokenMap();
-			} catch (ParseException e) {
-				LOG.warn("Error executing cleanupTokenMap", e);
-			}
-
+			tokenManager.cleanupTokenMap();
 		}
 	}
 
 	static public class ClearTokenRequestBody {
-
 		public String access_token;
 	}
 
 	@ApiOperation(authorizations = { @Authorization(value = "AuthorizationToken") }, value = "clearToken")
-	@RequestMapping(value = { "/{database:.+}" + URL_BASE_PREFIX + "/" + URL_TOKEN, "/{database:.+}" + URL_BASE_PREFIX
-			+ "/" + URL_LOGOUT_V1_3 }, method = RequestMethod.DELETE, produces = "application/json")
-	public Map<String, Object> clearToken(HttpServletRequest request, HttpServletResponse response,
-			@PathVariable String database, @RequestBody(required = false) ClearTokenRequestBody bodyToken) {
+	@RequestMapping(value = { "/{database:.+}" + URL_BASE_PREFIX + "/" + URL_TOKEN, "/{database:.+}" + URL_BASE_PREFIX + "/" + URL_LOGOUT_V1_3 }, method = RequestMethod.DELETE, produces = "application/json")
+	public Map<String, Object> clearToken(HttpServletRequest request, HttpServletResponse response, @PathVariable String database, @RequestBody(required = false) ClearTokenRequestBody bodyToken) {
 		String token = tokenManager.readToken(request);
 		String bodyTokenValue = bodyToken != null ? bodyToken.access_token : null;
 		int responseStatus;
@@ -1624,8 +1607,6 @@ public class BrapiRestController implements ServletContextAware {
 			return null;
 		}
 
-//        tokenManager.removeToken(token);
-//        SecurityContextHolder.clearContext();	// make it unretrievable
 		Map<String, Object> resultObject = getStandardResponse(0, 0, 0, 0, false);
 		Status status = new Status();
 		status.setMessage("User has been logged out successfully.");
