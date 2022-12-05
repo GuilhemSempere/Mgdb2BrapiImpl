@@ -187,7 +187,7 @@ public class BrapiRestController implements ServletContextAware {
 
 
     static {
-        extRefList.addAll(Arrays.asList(BrapiService.BRAPI_FIELD_germplasmExternalReferenceId, BrapiService.BRAPI_FIELD_germplasmExternalReferenceSource, BrapiService.BRAPI_FIELD_extGermplasmDbId));
+        extRefList.addAll(Arrays.asList(BrapiService.BRAPI_FIELD_externalReferenceId, BrapiService.BRAPI_FIELD_externalReferenceSource, BrapiService.BRAPI_FIELD_extGermplasmDbId));
     }
 
 
@@ -991,7 +991,7 @@ public class BrapiRestController implements ServletContextAware {
 			+ URL_MARKER_PROFILES, method = RequestMethod.GET, produces = "application/json")
 	public Map<String, Object> markerProfiles(HttpServletRequest request, HttpServletResponse response,
 			@PathVariable String database,
-			@RequestParam(required = false, name = BrapiService.BRAPI_FIELD_germplasmExternalReferenceId) Collection<String> germplasmDbIds,
+			@RequestParam(required = false, name = BrapiService.BRAPI_FIELD_externalReferenceId) Collection<String> germplasmDbIds,
 			@RequestParam(required = false, name = "studyDbId") Integer studyDbId,
 			@RequestParam(required = false) Integer pageSize, @RequestParam(required = false) Integer page)
 			throws Exception {
