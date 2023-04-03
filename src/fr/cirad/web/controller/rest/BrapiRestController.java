@@ -1452,13 +1452,10 @@ public class BrapiRestController implements ServletContextAware {
 	}
 
 	@ApiOperation(authorizations = { @Authorization(value = "AuthorizationToken") }, value = "alleleMatrixExportStatus")
-	@RequestMapping(value = "/{database:.+}" + URL_BASE_PREFIX + "/" + URL_ALLELE_MATRIX_STATUS
-			+ "/{extractID}", method = RequestMethod.GET, produces = "application/json")
-	public Map<String, Object> alleleMatrixExportStatus(HttpServletRequest request, HttpServletResponse response,
-			@PathVariable String database, @PathVariable String extractID) throws Exception {
+	@RequestMapping(value = "/{database:.+}" + URL_BASE_PREFIX + "/" + URL_ALLELE_MATRIX_STATUS + "/{extractID}", method = RequestMethod.GET, produces = "application/json")
+	public Map<String, Object> alleleMatrixExportStatus(HttpServletRequest request, HttpServletResponse response, @PathVariable String database, @PathVariable String extractID) throws Exception {
 		String token = tokenManager.readToken(request);
-		if (!tokenManager.canUserReadDB(token, database)
-				|| !extractID.endsWith(Helper.convertToMD5(database + "__" + token))) {
+		if (!tokenManager.canUserReadDB(token, database) || !extractID.endsWith(Helper.convertToMD5(database + "__" + token))) {
 			response.setStatus(HttpServletResponse.SC_FORBIDDEN);
 			return null;
 		}
@@ -1469,8 +1466,7 @@ public class BrapiRestController implements ServletContextAware {
 			return null;
 		}
 
-		Map<String, Object> resultObject = getStandardResponse(0, (int) (progress.getCurrentStepProgress()), 0, 0,
-				true);
+		Map<String, Object> resultObject = getStandardResponse(0, (int) (progress.getCurrentStepProgress()), 0, 0, true);
 		Metadata metadata = (Metadata) resultObject.get("metadata");
 		Status status = new Status();
 		status.setCode("asynchstatus");
@@ -1482,9 +1478,8 @@ public class BrapiRestController implements ServletContextAware {
 
 		if (progress.isComplete()) {
 			String sWebAppRoot = appConfig.get("enforcedWebapRootUrl");
-			String fileUrl = (sWebAppRoot == null
-					? BackOfficeController.determinePublicHostName(request) + request.getContextPath()
-					: sWebAppRoot) + "/" + TMP_OUTPUT_FOLDER + "/" + extractID + ".tsv";
+			/*FIXME: not sure this project should depend on role_manager*/
+			String fileUrl = (sWebAppRoot == null ? BackOfficeController.determinePublicHostName(request) + request.getContextPath() : sWebAppRoot) + "/" + TMP_OUTPUT_FOLDER + "/" + extractID + ".tsv";
 			metadata.setDatafiles(Arrays.asList(fileUrl));
 		}
 
