@@ -21,7 +21,6 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.net.URLDecoder;
-import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -84,6 +83,7 @@ import com.mongodb.client.MongoCursor;
 
 import fr.cirad.io.brapi.BrapiService;
 import fr.cirad.mgdb.exporting.IExportHandler;
+import fr.cirad.mgdb.model.mongo.maintypes.Assembly;
 import fr.cirad.mgdb.model.mongo.maintypes.GenotypingProject;
 import fr.cirad.mgdb.model.mongo.maintypes.GenotypingSample;
 import fr.cirad.mgdb.model.mongo.maintypes.Individual;
@@ -471,6 +471,8 @@ public class BrapiRestController implements ServletContextAware {
 		MongoTemplate mongoTemplate = MongoTemplateManager.get(database);
 
 		ArrayList<Map<String, Object>> data = new ArrayList<>();
+		List<Assembly> assemblies = mongoTemplate.findAll(Assembly.class);
+		Integer nAssemblyId = assemblies.size() == 0 ? null : assemblies.get(0).getId();
 		if (speciesId == null || speciesId.equals(MongoTemplateManager.getTaxonName(database)))
 			try {
 				if (tokenManager.canUserReadDB(tokenManager.readToken(request), database)) {
@@ -482,10 +484,9 @@ public class BrapiRestController implements ServletContextAware {
 					map.put("unit", "Mb");
 					map.put("markerCount", Helper.estimDocCount(mongoTemplate, VariantData.class));
 					HashSet<String> distinctSequences = new HashSet<>();
-					Iterator<GenotypingProject> projectIt = mongoTemplate.find(new Query(), GenotypingProject.class)
-							.iterator();
+					Iterator<GenotypingProject> projectIt = mongoTemplate.find(new Query(), GenotypingProject.class).iterator();
 					while (projectIt.hasNext()) {
-						distinctSequences.addAll(projectIt.next().getSequences());
+						distinctSequences.addAll(projectIt.next().getContigs(nAssemblyId));
 					}
 					map.put("linkageGroupCount", distinctSequences.size());
 					data.add(map);
@@ -513,6 +514,9 @@ public class BrapiRestController implements ServletContextAware {
 			return null;
 		}
 
+		List<Assembly> assemblies = mongoTemplate.findAll(Assembly.class);
+		Integer nAssemblyId = assemblies.size() == 0 ? null : assemblies.get(0).getId();
+		String refPosPathWithTrailingDot = Assembly.getVariantRefPosPath(nAssemblyId) + ".";
 		Map<String, Object> resultObject = getStandardResponse(0, 0, 0, 0, false);
 		Map<String, Object> map = new HashMap<>();
 		try {
@@ -524,38 +528,26 @@ public class BrapiRestController implements ServletContextAware {
 
 				List<HashMap<String, Comparable>> linkageGroups = new ArrayList<>();
 				HashSet<String> distinctSequences = new HashSet<>();
-				Iterator<GenotypingProject> projectIt = mongoTemplate.find(new Query(), GenotypingProject.class)
-						.iterator();
+				Iterator<GenotypingProject> projectIt = mongoTemplate.find(new Query(), GenotypingProject.class).iterator();
 				while (projectIt.hasNext()) {
-					distinctSequences.addAll(projectIt.next().getSequences());
+					distinctSequences.addAll(projectIt.next().getContigs(nAssemblyId));
 				}
 				List<Document> pipeline = new ArrayList<Document>();
-				pipeline.add(new Document("$match",
-						new Document(
-								VariantData.FIELDNAME_REFERENCE_POSITION + "." + ReferencePosition.FIELDNAME_SEQUENCE,
-								new Document("$in", distinctSequences))));
-				Document groupObject = new Document("_id",
-						"$" + VariantData.FIELDNAME_REFERENCE_POSITION + "." + ReferencePosition.FIELDNAME_SEQUENCE);
+				pipeline.add(new Document("$match", new Document(refPosPathWithTrailingDot + ReferencePosition.FIELDNAME_SEQUENCE, new Document("$in", distinctSequences))));
+				Document groupObject = new Document("_id", "$" + refPosPathWithTrailingDot + ReferencePosition.FIELDNAME_SEQUENCE);
 				groupObject.put("count", new Document("$sum", 1));
 				pipeline.add(new Document("$group", groupObject));
-				MongoCursor<Document> it = mongoTemplate
-						.getCollection(MongoTemplateManager.getMongoCollectionName(VariantData.class))
-						.aggregate(pipeline).iterator();
+				MongoCursor<Document> it = mongoTemplate.getCollection(MongoTemplateManager.getMongoCollectionName(VariantData.class)).aggregate(pipeline).iterator();
 				while (it.hasNext()) {
 					Document obj = (Document) it.next();
 					HashMap<String, Comparable> linkageGroup = new HashMap<>();
 					linkageGroup.put("linkageGroupName", obj.getString("_id"));
 					linkageGroup.put("markerCount", obj.getInteger("count"));
-					Query query = new Query(Criteria.where(
-							VariantData.FIELDNAME_REFERENCE_POSITION + "." + ReferencePosition.FIELDNAME_SEQUENCE)
-							.is(obj.getString("_id")));
-					query.with(Sort.by(Sort.Direction.DESC,
-							VariantData.FIELDNAME_REFERENCE_POSITION + "." + ReferencePosition.FIELDNAME_START_SITE))
-							.limit(1);
-					query.fields().include(
-							VariantData.FIELDNAME_REFERENCE_POSITION + "." + ReferencePosition.FIELDNAME_START_SITE);
+					Query query = new Query(Criteria.where(refPosPathWithTrailingDot + ReferencePosition.FIELDNAME_SEQUENCE).is(obj.getString("_id")));
+					query.with(Sort.by(Sort.Direction.DESC, refPosPathWithTrailingDot + ReferencePosition.FIELDNAME_START_SITE)).limit(1);
+					query.fields().include(refPosPathWithTrailingDot + ReferencePosition.FIELDNAME_START_SITE);
 					VariantData variant = mongoTemplate.findOne(query, VariantData.class);
-					linkageGroup.put("maxPosition", variant.getReferencePosition().getStartSite());
+					linkageGroup.put("maxPosition", variant.getDefaultReferencePosition().getStartSite());
 					linkageGroups.add(linkageGroup);
 				}
 				if (!linkageGroups.isEmpty()) {
@@ -570,8 +562,7 @@ public class BrapiRestController implements ServletContextAware {
 	}
 
 	@ApiOperation(authorizations = { @Authorization(value = "AuthorizationToken") }, value = "mapMarkerPositions")
-	@RequestMapping(value = "/{database:.+}" + URL_BASE_PREFIX + "/"
-			+ URL_MAP_POSITIONS, method = RequestMethod.GET, produces = "application/json")
+	@RequestMapping(value = "/{database:.+}" + URL_BASE_PREFIX + "/" + URL_MAP_POSITIONS, method = RequestMethod.GET, produces = "application/json")
 	public Map<String, Object> mapMarkerPositions(HttpServletRequest request, HttpServletResponse response,
 			@PathVariable final String database, @PathVariable String mapDbId,
 			@RequestParam(required = false, name = "linkageGroupName") Collection<String> linkageGroupNames,
@@ -597,22 +588,21 @@ public class BrapiRestController implements ServletContextAware {
 			page = 0;
 		}
 
+		List<Assembly> assemblies = mongoTemplate.findAll(Assembly.class);
+		Integer nAssemblyId = assemblies.size() == 0 ? null : assemblies.get(0).getId();
+		String refPosPathWithTrailingDot = Assembly.getVariantRefPosPath(nAssemblyId) + ".";
 		try {
 			if (tokenManager.canUserReadDB(tokenManager.readToken(request), database)) {
 				List<Criteria> crit = new ArrayList<>();
 				if (linkageGroupNames != null) {
-					crit.add(Criteria.where(
-							VariantData.FIELDNAME_REFERENCE_POSITION + "." + ReferencePosition.FIELDNAME_SEQUENCE)
-							.in(linkageGroupNames));
+					crit.add(Criteria.where(refPosPathWithTrailingDot + ReferencePosition.FIELDNAME_SEQUENCE).in(linkageGroupNames));
 				}
 
 				Document marker = null;
 
 				Document projectObject = new Document();
-				projectObject.put(VariantData.FIELDNAME_REFERENCE_POSITION + "." + ReferencePosition.FIELDNAME_SEQUENCE,
-						1);
-				projectObject.put(
-						VariantData.FIELDNAME_REFERENCE_POSITION + "." + ReferencePosition.FIELDNAME_START_SITE, 1);
+				projectObject.put(refPosPathWithTrailingDot + ReferencePosition.FIELDNAME_SEQUENCE, 1);
+				projectObject.put(refPosPathWithTrailingDot + ReferencePosition.FIELDNAME_START_SITE, 1);
 
 				HashMap<Integer, Comparable> markerIndexMap = markerIndexByModuleMap.get(database);
 				if (markerIndexMap == null) {
@@ -620,10 +610,7 @@ public class BrapiRestController implements ServletContextAware {
 					markerIndexByModuleMap.put(database, markerIndexMap);
 				}
 
-				nCount = mongoTemplate.count(
-						crit.size() == 0 ? new Query()
-								: new Query(new Criteria().andOperator(crit.toArray(new Criteria[crit.size()]))),
-						VariantData.class);
+				nCount = mongoTemplate.count(crit.size() == 0 ? new Query() : new Query(new Criteria().andOperator(crit.toArray(new Criteria[crit.size()]))), VariantData.class);
 
 				// hack to avoid using skip which slows down the query
 				Comparable<Integer> previousMarker = page == 0 ? null : markerIndexMap.get(page * pageSize - 1);
@@ -631,12 +618,7 @@ public class BrapiRestController implements ServletContextAware {
 					crit.add(Criteria.where("_id").gt(previousMarker));
 				}
 
-				FindIterable<Document> iterable = mongoTemplate
-						.getCollection(mongoTemplate.getCollectionName(VariantData.class)).find(
-								crit.size() == 0 ? new Document()
-										: new Query(new Criteria().andOperator(crit.toArray(new Criteria[crit.size()])))
-												.getQueryObject())
-						.projection(projectObject).sort(new Document("_id", 1));
+				FindIterable<Document> iterable = mongoTemplate.getCollection(mongoTemplate.getCollectionName(VariantData.class)).find(crit.size() == 0 ? new Document() : new Query(new Criteria().andOperator(crit.toArray(new Criteria[crit.size()]))).getQueryObject()).projection(projectObject).sort(new Document("_id", 1));
 				if (pageSize != null) {
 					iterable.limit(pageSize);
 					if (page != null && previousMarker == null) {
@@ -650,12 +632,8 @@ public class BrapiRestController implements ServletContextAware {
 					Map<String, Object> variant = new HashMap<>();
 					variant.put("markerDbId", marker.get("_id").toString());
 					variant.put("markerName", variant.get("markerDbId").toString());
-					variant.put("linkageGroupName", Helper.readPossiblyNestedField(marker,
-							VariantData.FIELDNAME_REFERENCE_POSITION + "." + ReferencePosition.FIELDNAME_SEQUENCE,
-							"; "));
-					variant.put("location", Helper.readPossiblyNestedField(marker,
-							VariantData.FIELDNAME_REFERENCE_POSITION + "." + ReferencePosition.FIELDNAME_START_SITE,
-							"; "));
+					variant.put("linkageGroupName", Helper.readPossiblyNestedField(marker, refPosPathWithTrailingDot + ReferencePosition.FIELDNAME_SEQUENCE, "; ", null));
+					variant.put("location", Helper.readPossiblyNestedField(marker, refPosPathWithTrailingDot + ReferencePosition.FIELDNAME_START_SITE, "; ", null));
 					data.add(variant);
 				}
 				if (marker != null) {
@@ -702,9 +680,12 @@ public class BrapiRestController implements ServletContextAware {
 			Iterator<GenotypingProject> projectIt = mongoTemplate.findAll(GenotypingProject.class).iterator();
 			while (projectIt.hasNext()) {
 				GenotypingProject gp = projectIt.next();
-				if (!tokenManager.canUserReadProject(tokenManager.readToken(request), database, gp.getId())) {
-					continue;
+				try {
+					if (!tokenManager.canUserReadProject(tokenManager.readToken(request), database, gp.getId()))
+						continue;
 				}
+				catch (ObjectNotFoundException ignored)
+				{}
 
 				Map<String, Object> study = new HashMap<>(), additionalInfo = new HashMap<>();
 				study.put("studyDbId", "" + gp.getId());
@@ -1048,9 +1029,7 @@ public class BrapiRestController implements ServletContextAware {
 	}
 
 	@ApiOperation(authorizations = { @Authorization(value = "AuthorizationToken") }, value = "markers")
-	@RequestMapping(value = { "/{database:.+}" + URL_BASE_PREFIX + "/" + URL_MARKERS_SEARCH,
-			"/{database:.+}" + URL_BASE_PREFIX + "/" + URL_MARKERS_SEARCH_V1_0 }, method = {
-					RequestMethod.GET }, produces = "application/json")
+	@RequestMapping(value = { "/{database:.+}" + URL_BASE_PREFIX + "/" + URL_MARKERS_SEARCH, "/{database:.+}" + URL_BASE_PREFIX + "/" + URL_MARKERS_SEARCH_V1_0 }, method = {RequestMethod.GET }, produces = "application/json")
 	public Map<String, Object> markers(HttpServletRequest request, HttpServletResponse response,
 			@PathVariable String database, @RequestParam(required = false) Collection<String> markerDbIds,
 			@RequestParam(required = false) Collection<String> name, @RequestParam(required = false) String matchMethod,
@@ -1079,15 +1058,9 @@ public class BrapiRestController implements ServletContextAware {
 				if (fIDsPassed || "exact".equals(matchMethod)) {
 					crits.add(Criteria.where("_id").in(name));
 				} else if ("case_insensitive".equals(matchMethod)) {
-					crits.add(Criteria.where("_id")
-							.in(name.stream().map(idString -> Pattern.compile(idString, Pattern.CASE_INSENSITIVE))
-									.collect(Collectors.toList())));
+					crits.add(Criteria.where("_id").in(name.stream().map(idString -> Pattern.compile(idString, Pattern.CASE_INSENSITIVE)).collect(Collectors.toList())));
 				} else if ("wildcard".equals(matchMethod)) {
-					crits.add(Criteria.where("_id")
-							.in(name.stream()
-									.map(idString -> Pattern.compile("^" + idString.replaceAll("\\*", ".*")
-											.replaceAll("%", ".*").replaceAll("\\?", ".") + "$"))
-									.collect(Collectors.toList())));
+					crits.add(Criteria.where("_id").in(name.stream().map(idString -> Pattern.compile("^" + idString.replaceAll("\\*", ".*").replaceAll("%", ".*").replaceAll("\\?", ".") + "$")).collect(Collectors.toList())));
 				} else // if (matchMethod != null && !"exact".equals(matchMethod))
 				{
 					throw new Exception(matchMethod + " matchMethod not supported");
@@ -1102,13 +1075,16 @@ public class BrapiRestController implements ServletContextAware {
 				pageSize = MAX_SUPPORTED_MARKER_LIST_SIZE;
 			}
 
-			Query q = crits.size() == 0 ? new Query()
-					: new Query(new Criteria().andOperator(crits.toArray(new Criteria[crits.size()])));
+			Query q = crits.size() == 0 ? new Query() : new Query(new Criteria().andOperator(crits.toArray(new Criteria[crits.size()])));
 			count = mongoTemplate.count(q, VariantData.class);
 
+			List<Assembly> assemblies = mongoTemplate.findAll(Assembly.class);
+			Integer nAssemblyId = assemblies.size() == 0 ? null : assemblies.get(0).getId();
+			String refPosPath = Assembly.getVariantRefPosPath(nAssemblyId);
+			
 			Document projectObject = new Document(VariantData.FIELDNAME_KNOWN_ALLELES, 1);
 			projectObject.put(VariantData.FIELDNAME_TYPE, 1);
-			projectObject.put(VariantData.FIELDNAME_REFERENCE_POSITION, 1);
+			projectObject.put(refPosPath, 1);
 			if ("synonyms".equals(include)) {
 				projectObject.put(VariantData.FIELDNAME_SYNONYMS, 1);
 			}
@@ -1134,14 +1110,7 @@ public class BrapiRestController implements ServletContextAware {
 					variantDTO.put("type", markerType);
 				}
 				variantDTO.put("refAlt", (List<String>) dbVariant.get(VariantData.FIELDNAME_KNOWN_ALLELES));
-				String defaultDisplayName = MgdbDao.idLooksGenerated(dbId) ? null : dbId.toString(); // we don't invent
-																										// names for
-																										// ObjectIDs
-																										// since we
-																										// would not
-																										// able to apply
-																										// a filter on
-																										// them
+				String defaultDisplayName = MgdbDao.idLooksGenerated(dbId) ? null : dbId.toString(); // we don't invent names for ObjectIDs since we would not able to apply a filter on them
 				variantDTO.put("defaultDisplayName", defaultDisplayName);
 				variantDTO.put("analysisMethods", null);
 				HashSet<String> synonymsObject = new HashSet<String>();
@@ -1170,11 +1139,8 @@ public class BrapiRestController implements ServletContextAware {
 	}
 
 	@ApiOperation(authorizations = { @Authorization(value = "AuthorizationToken") }, value = "markerDetails")
-	@RequestMapping(value = "/{database:.+}" + URL_BASE_PREFIX + "/" + URL_MARKER_DETAILS, method = {
-			RequestMethod.GET }, produces = "application/json")
-	public Map<String, Object> markerDetails(HttpServletRequest request, HttpServletResponse response,
-			@PathVariable String database, @PathVariable("markerDbId") String markerDbId)
-			throws ObjectNotFoundException, Exception {
+	@RequestMapping(value = "/{database:.+}" + URL_BASE_PREFIX + "/" + URL_MARKER_DETAILS, method = {RequestMethod.GET }, produces = "application/json")
+	public Map<String, Object> markerDetails(HttpServletRequest request, HttpServletResponse response, @PathVariable String database, @PathVariable("markerDbId") String markerDbId) throws ObjectNotFoundException, Exception {
 		MongoTemplate mongoTemplate = MongoTemplateManager.get(database);
 		if (mongoTemplate == null) {
 			response.setStatus(HttpServletResponse.SC_NOT_FOUND);
@@ -1191,14 +1157,7 @@ public class BrapiRestController implements ServletContextAware {
 				variantDTO.put("markerDbId", markerDbId);
 				variantDTO.put("type", variant.getType());
 				variantDTO.put("refAlt", variant.getKnownAlleles());
-				String defaultDisplayName = MgdbDao.idLooksGenerated(markerDbId) ? null : markerDbId; // we don't invent
-																										// names for
-																										// generated IDs
-																										// since we
-																										// would not
-																										// able to apply
-																										// a filter on
-																										// them
+				String defaultDisplayName = MgdbDao.idLooksGenerated(markerDbId) ? null : markerDbId; // we don't invent names for ObjectIDs since we would not able to apply a filter on them
 				variantDTO.put("defaultDisplayName", defaultDisplayName);
 				variantDTO.put("analysisMethods", null);
 				HashSet<String> synonymsObject = new HashSet<String>();
@@ -1265,7 +1224,7 @@ public class BrapiRestController implements ServletContextAware {
 	static public class AlleleMatrixRequest {
 
 		public Collection<String> markerprofileDbId;
-		public List<Object> markerDbId;
+		public List<String> markerDbId;
 		public String unknownString;
 		public String sepUnphased;
 		public String sepPhased;
@@ -1291,7 +1250,7 @@ public class BrapiRestController implements ServletContextAware {
 	public Map<String, Object> alleleMatrix(HttpServletRequest request, HttpServletResponse response,
 			@PathVariable String database,
 			@RequestParam(name = "markerprofileDbId") Collection<String> markerprofileDbIDs,
-			@RequestParam(name = "markerDbId", required = false) List<Object> markerDbIDs,
+			@RequestParam(name = "markerDbId", required = false) List<String> markerDbId,
 			@RequestParam(required = false) String unknownString, @RequestParam(required = false) String sepUnphased,
 			@RequestParam(required = false) String sepPhased, @RequestParam(required = false) Boolean expandHomozygotes,
 			@RequestParam(required = false) String format, @RequestParam(required = false) Integer pageSize,
@@ -1321,18 +1280,15 @@ public class BrapiRestController implements ServletContextAware {
 				.in(sortedMarkerprofileDbIDs.stream().map(id -> Integer.parseInt(id)).collect(Collectors.toList()))),
 				GenotypingSample.class);
 
-		List<Object> wantedMarkerIDs;
-		if (markerDbIDs != null) {
-			wantedMarkerIDs = markerDbIDs;
-		} else {
-			wantedMarkerIDs = new ArrayList<Object>();
+		List<String> wantedMarkerIDs;
+		if (markerDbId != null)
+			wantedMarkerIDs = markerDbId;
+		else {
+			wantedMarkerIDs = new ArrayList<String>();
 			Document projectObject = new Document("_id", 1);
-			MongoCursor<Document> markerCursor = mongoTemplate
-					.getCollection(mongoTemplate.getCollectionName(VariantData.class)).find(new Document())
-					.projection(projectObject).iterator();
-			while (markerCursor.hasNext()) {
-				wantedMarkerIDs.add(markerCursor.next().get("_id"));
-			}
+			MongoCursor<Document> markerCursor = mongoTemplate.getCollection(mongoTemplate.getCollectionName(VariantData.class)).find(new Document()).projection(projectObject).iterator();
+			while (markerCursor.hasNext())
+				wantedMarkerIDs.add(markerCursor.next().get("_id").toString());
 		}
 
 		String unknownGtCode = unknownString == null ? "-" : unknownString;
@@ -1348,15 +1304,13 @@ public class BrapiRestController implements ServletContextAware {
 			Metadata metadata = (Metadata) resultObject.get("metadata");
 			metadata.setStatus(Arrays.asList(status));
 
-			final List<Object> finalMarkerList = wantedMarkerIDs;
+			final List<String> finalMarkerList = wantedMarkerIDs;
 			new Thread() {
 				public void run() {
-					ProgressIndicator progress = new ProgressIndicator(extractId,
-							new String[] { "Generating export file" });
+					ProgressIndicator progress = new ProgressIndicator(extractId, new String[] { "Generating export file" });
 					ProgressIndicator.registerProgressIndicator(progress);
 
-					int nChunkIndex = 0,
-							nChunkSize = IExportHandler.computeQueryChunkSize(mongoTemplate, finalMarkerList.size());
+					int nChunkIndex = 0, nChunkSize = IExportHandler.computeQueryChunkSize(mongoTemplate, finalMarkerList.size());
 
 					FileWriter fw = null;
 					try {
@@ -1374,11 +1328,8 @@ public class BrapiRestController implements ServletContextAware {
 						while (nChunkIndex * nChunkSize < finalMarkerList.size()) {
 							progress.setCurrentStepProgress((nChunkIndex * nChunkSize) * 100 / finalMarkerList.size());
 
-							List<Object> markerSubList = finalMarkerList.subList(nChunkIndex * nChunkSize,
-									Math.min(finalMarkerList.size(), ++nChunkIndex * nChunkSize));
-							LinkedHashMap<VariantData, Collection<VariantRunData>> variantsAndRuns = MgdbDao
-									.getSampleGenotypes(mongoTemplate, samples, markerSubList, true,
-											null/* new Sort(Sort.Direction.DESC, "_id") */);
+							List<String> markerSubList = finalMarkerList.subList(nChunkIndex * nChunkSize, Math.min(finalMarkerList.size(), ++nChunkIndex * nChunkSize));
+							LinkedHashMap<VariantData, Collection<VariantRunData>> variantsAndRuns = MgdbDao.getSampleGenotypes(mongoTemplate, samples, markerSubList, true, null/* new Sort(Sort.Direction.DESC, "_id") */);
 							VariantData[] variants = variantsAndRuns.keySet()
 									.toArray(new VariantData[variantsAndRuns.size()]);
 							for (int i = 0; i < variantsAndRuns.size(); i++) {
@@ -1449,7 +1400,7 @@ public class BrapiRestController implements ServletContextAware {
 			}
 
 			int numberOfMarkersToReturn = (int) Math.ceil(pageSize / markerprofileDbIDs.size());
-			int totalMarkerCount = (int) (markerDbIDs != null ? markerDbIDs.size()
+			int totalMarkerCount = (int) (markerDbId != null ? markerDbId.size()
 					: Helper.estimDocCount(mongoTemplate, VariantData.class));
 
 			wantedMarkerIDs = wantedMarkerIDs.subList(page * numberOfMarkersToReturn,
@@ -1501,13 +1452,10 @@ public class BrapiRestController implements ServletContextAware {
 	}
 
 	@ApiOperation(authorizations = { @Authorization(value = "AuthorizationToken") }, value = "alleleMatrixExportStatus")
-	@RequestMapping(value = "/{database:.+}" + URL_BASE_PREFIX + "/" + URL_ALLELE_MATRIX_STATUS
-			+ "/{extractID}", method = RequestMethod.GET, produces = "application/json")
-	public Map<String, Object> alleleMatrixExportStatus(HttpServletRequest request, HttpServletResponse response,
-			@PathVariable String database, @PathVariable String extractID) throws Exception {
+	@RequestMapping(value = "/{database:.+}" + URL_BASE_PREFIX + "/" + URL_ALLELE_MATRIX_STATUS + "/{extractID}", method = RequestMethod.GET, produces = "application/json")
+	public Map<String, Object> alleleMatrixExportStatus(HttpServletRequest request, HttpServletResponse response, @PathVariable String database, @PathVariable String extractID) throws Exception {
 		String token = tokenManager.readToken(request);
-		if (!tokenManager.canUserReadDB(token, database)
-				|| !extractID.endsWith(Helper.convertToMD5(database + "__" + token))) {
+		if (!tokenManager.canUserReadDB(token, database) || !extractID.endsWith(Helper.convertToMD5(database + "__" + token))) {
 			response.setStatus(HttpServletResponse.SC_FORBIDDEN);
 			return null;
 		}
@@ -1518,8 +1466,7 @@ public class BrapiRestController implements ServletContextAware {
 			return null;
 		}
 
-		Map<String, Object> resultObject = getStandardResponse(0, (int) (progress.getCurrentStepProgress()), 0, 0,
-				true);
+		Map<String, Object> resultObject = getStandardResponse(0, (int) (progress.getCurrentStepProgress()), 0, 0, true);
 		Metadata metadata = (Metadata) resultObject.get("metadata");
 		Status status = new Status();
 		status.setCode("asynchstatus");
@@ -1531,9 +1478,8 @@ public class BrapiRestController implements ServletContextAware {
 
 		if (progress.isComplete()) {
 			String sWebAppRoot = appConfig.get("enforcedWebapRootUrl");
-			String fileUrl = (sWebAppRoot == null
-					? BackOfficeController.determinePublicHostName(request) + request.getContextPath()
-					: sWebAppRoot) + "/" + TMP_OUTPUT_FOLDER + "/" + extractID + ".tsv";
+			/*FIXME: not sure this project should depend on role_manager*/
+			String fileUrl = (sWebAppRoot == null ? BackOfficeController.determinePublicHostName(request) + request.getContextPath() : sWebAppRoot) + "/" + TMP_OUTPUT_FOLDER + "/" + extractID + ".tsv";
 			metadata.setDatafiles(Arrays.asList(fileUrl));
 		}
 
