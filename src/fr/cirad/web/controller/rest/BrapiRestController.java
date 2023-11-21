@@ -99,7 +99,7 @@ import fr.cirad.tools.Helper;
 import fr.cirad.tools.ProgressIndicator;
 import fr.cirad.tools.mongo.MongoTemplateManager;
 import fr.cirad.tools.security.base.AbstractTokenManager;
-//import fr.cirad.web.controller.BackOfficeController;
+import fr.cirad.web.controller.BackOfficeController;
 import io.swagger.annotations.ApiOperation;
 import io.swagger.annotations.Authorization;
 import jhi.brapi.api.Metadata;
@@ -1476,12 +1476,12 @@ public class BrapiRestController implements ServletContextAware {
 			response.setStatus(HttpServletResponse.SC_NOT_FOUND);
 		}
 
-//		if (progress.isComplete()) {
-//			String sWebAppRoot = appConfig.get("enforcedWebapRootUrl");
-//			/*FIXME: not sure this project should depend on role_manager*/
-//			String fileUrl = (sWebAppRoot == null ? BackOfficeController.determinePublicHostName(request) + request.getContextPath() : sWebAppRoot) + "/" + TMP_OUTPUT_FOLDER + "/" + extractID + ".tsv";
-//			metadata.setDatafiles(Arrays.asList(fileUrl));
-//		}
+		if (progress.isComplete()) {
+			String sWebAppRoot = appConfig.get("enforcedWebapRootUrl");
+			/*FIXME: not sure this project should depend on role_manager*/
+			String fileUrl = (sWebAppRoot == null ? BackOfficeController.determinePublicHostName(request) + request.getContextPath() : sWebAppRoot) + "/" + TMP_OUTPUT_FOLDER + "/" + extractID + ".tsv";
+			metadata.setDatafiles(Arrays.asList(fileUrl));
+		}
 
 		metadata.setStatus(Arrays.asList(status));
 		return resultObject;
