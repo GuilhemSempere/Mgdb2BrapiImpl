@@ -1000,7 +1000,7 @@ public class BrapiRestController implements ServletContextAware {
 				continue;
 			}
 
-            Collection<GenotypingSample> samplesForProject = MgdbDao.getInstance().loadSamplesWithAllMetadata(database, AbstractTokenManager.getUserNameFromAuthentication(tokenManager.getAuthenticationFromToken(tokenManager.readToken(request))), null, MgdbDao.getSamplesForProject(database, gp.getId(), individuals).stream().map(sp -> sp.getId()).collect(Collectors.toList())).values();
+            Collection<GenotypingSample> samplesForProject = MgdbDao.getInstance().loadSamplesWithAllMetadata(database, AbstractTokenManager.getUserNameFromAuthentication(tokenManager.getAuthenticationFromToken(tokenManager.readToken(request))), null, MgdbDao.getSamplesForProject(database, gp.getId(), individuals).stream().map(sp -> sp.getId()).collect(Collectors.toList()), null).values();
             for (GenotypingSample sample : samplesForProject) {
                 Map<String, Object> markerProfile = new HashMap<>();
                 String germplasmId = sample.getIndividual();
