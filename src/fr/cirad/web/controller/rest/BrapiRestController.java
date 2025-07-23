@@ -428,7 +428,8 @@ public class BrapiRestController implements ServletContextAware {
 				+ (taxon != null && !taxon.equals(species) ? (species != null ? " ; " : "") + "Taxon: " + taxon : "");
 		resultObject.put("description",
 				"Database: " + database + " ; " + (!taxoDesc.isEmpty() ? taxoDesc + " ; " : "")
-						+ Helper.estimDocCount(mongoTemplate, Individual.class) + " germplasms ; "
+						+ Helper.estimDocCount(mongoTemplate, Individual.class) + " germplasm ; "
+						+ Helper.estimDocCount(mongoTemplate, GenotypingSample.class) + " samples ; "
 						+ Helper.estimDocCount(mongoTemplate, VariantData.class) + " markers");
 		resultObject.put("contact", "gigwa@cirad.fr");
 		return resultObject;
