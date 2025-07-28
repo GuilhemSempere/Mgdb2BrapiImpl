@@ -720,7 +720,7 @@ public class BrapiRestController implements ServletContextAware {
 
 		GenotypingProject gp = mongoTemplate.findById(studyDbId, GenotypingProject.class);
 		if (gp != null && tokenManager.canUserReadProject(tokenManager.readToken(request), database, gp.getId())) {
-			for (String individual : MgdbDao.getProjectIndividuals(database, gp.getId())) {
+			for (String individual : MgdbDao.getProjectIndividuals(database, new Integer[] {gp.getId()})) {
 				Map<String, Object> germplasm = new HashMap<>();
 				germplasm.put(BrapiService.BRAPI_FIELD_germplasmDbId, individual);
 				germplasm.put("germplasmName", individual);
