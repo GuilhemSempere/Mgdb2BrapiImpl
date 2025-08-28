@@ -44,6 +44,7 @@ import javax.servlet.ServletContext;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import fr.cirad.mgdb.model.mongo.maintypes.*;
 import org.apache.commons.collections.map.UnmodifiableMap;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.lang.exception.ExceptionUtils;
@@ -83,12 +84,6 @@ import com.mongodb.client.MongoCursor;
 
 import fr.cirad.io.brapi.BrapiService;
 import fr.cirad.mgdb.exporting.IExportHandler;
-import fr.cirad.mgdb.model.mongo.maintypes.Assembly;
-import fr.cirad.mgdb.model.mongo.maintypes.GenotypingProject;
-import fr.cirad.mgdb.model.mongo.maintypes.GenotypingSample;
-import fr.cirad.mgdb.model.mongo.maintypes.Individual;
-import fr.cirad.mgdb.model.mongo.maintypes.VariantData;
-import fr.cirad.mgdb.model.mongo.maintypes.VariantRunData;
 import fr.cirad.mgdb.model.mongo.subtypes.ReferencePosition;
 import fr.cirad.mgdb.model.mongo.subtypes.SampleGenotype;
 import fr.cirad.mgdb.model.mongo.subtypes.VariantRunDataId;
@@ -1278,6 +1273,8 @@ public class BrapiRestController implements ServletContextAware {
 				.in(sortedMarkerprofileDbIDs.stream().map(id -> Integer.parseInt(id)).collect(Collectors.toList()))),
 				GenotypingSample.class);
 
+        List<CallSet> callsets = MgdbDao.getCallSetsFromSamples(database, samples.stream().map(GenotypingSample::getId).collect(Collectors.toSet()));
+
 		List<String> wantedMarkerIDs;
 		if (markerDbId != null)
 			wantedMarkerIDs = markerDbId;
@@ -1327,7 +1324,7 @@ public class BrapiRestController implements ServletContextAware {
 							progress.setCurrentStepProgress((nChunkIndex * nChunkSize) * 100 / finalMarkerList.size());
 
 							List<String> markerSubList = finalMarkerList.subList(nChunkIndex * nChunkSize, Math.min(finalMarkerList.size(), ++nChunkIndex * nChunkSize));
-							LinkedHashMap<VariantData, Collection<VariantRunData>> variantsAndRuns = MgdbDao.getSampleGenotypes(mongoTemplate, samples, markerSubList, true, null/* new Sort(Sort.Direction.DESC, "_id") */);
+							LinkedHashMap<VariantData, Collection<VariantRunData>> variantsAndRuns = MgdbDao.getSampleGenotypes(mongoTemplate, callsets, markerSubList, true, null/* new Sort(Sort.Direction.DESC, "_id") */);
 							VariantData[] variants = variantsAndRuns.keySet()
 									.toArray(new VariantData[variantsAndRuns.size()]);
 							for (int i = 0; i < variantsAndRuns.size(); i++) {
@@ -1405,7 +1402,7 @@ public class BrapiRestController implements ServletContextAware {
 					Math.min(wantedMarkerIDs.size(), (page + 1) * numberOfMarkersToReturn));
 
 			LinkedHashMap<VariantData, Collection<VariantRunData>> variantsAndRuns = MgdbDao.getSampleGenotypes(
-					mongoTemplate, samples, wantedMarkerIDs, true, null/* new Sort(Sort.Direction.DESC, "_id") */); // query
+					mongoTemplate, callsets, wantedMarkerIDs, true, null/* new Sort(Sort.Direction.DESC, "_id") */); // query
 																													// mongo
 																													// db
 																													// for
