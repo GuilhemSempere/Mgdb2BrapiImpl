@@ -716,7 +716,7 @@ public class BrapiRestController implements ServletContextAware {
 
 		GenotypingProject gp = mongoTemplate.findById(studyDbId, GenotypingProject.class);
 		if (gp != null && tokenManager.canUserReadProject(tokenManager.readToken(request), database, gp.getId())) {
-			for (String individual : MgdbDao.getProjectIndividuals(database, new Integer[] {gp.getId()})) {
+			for (String individual : MgdbDao.getProjectIndividuals(database, Arrays.asList(gp.getId()))) {
 				Map<String, Object> germplasm = new HashMap<>();
 				germplasm.put(BrapiService.BRAPI_FIELD_germplasmDbId, individual);
 				germplasm.put("germplasmName", individual);
@@ -996,7 +996,7 @@ public class BrapiRestController implements ServletContextAware {
 				continue;
 			}
 
-            Collection<GenotypingSample> samplesForProject = MgdbDao.getInstance().loadSamplesWithAllMetadata(database, AbstractTokenManager.getUserNameFromAuthentication(tokenManager.getAuthenticationFromToken(tokenManager.readToken(request))), null, MgdbDao.getSamplesForProject(database, gp.getId(), individuals).stream().map(sp -> sp.getId()).collect(Collectors.toList()), null).values();
+            Collection<GenotypingSample> samplesForProject = MgdbDao.getInstance().loadSamplesWithAllMetadata(database, AbstractTokenManager.getUserNameFromAuthentication(tokenManager.getAuthenticationFromToken(tokenManager.readToken(request))), null, MgdbDao.getSamplesForProjects(database, Arrays.asList(gp.getId()), individuals).stream().map(sp -> sp.getId()).collect(Collectors.toList()), null).values();
             for (GenotypingSample sample : samplesForProject) {
                 Map<String, Object> markerProfile = new HashMap<>();
                 String germplasmId = sample.getIndividual();
