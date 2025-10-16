@@ -88,7 +88,6 @@ import fr.cirad.mgdb.model.mongo.subtypes.ReferencePosition;
 import fr.cirad.mgdb.model.mongo.subtypes.SampleGenotype;
 import fr.cirad.mgdb.model.mongo.subtypes.VariantRunDataId;
 import fr.cirad.mgdb.model.mongodao.MgdbDao;
-import fr.cirad.tools.AlphaNumericComparator;
 import fr.cirad.tools.AppConfig;
 import fr.cirad.tools.Helper;
 import fr.cirad.tools.ProgressIndicator;
@@ -978,13 +977,13 @@ public class BrapiRestController implements ServletContextAware {
 //		LOG.debug("markerProfiles called");
 		long before = System.currentTimeMillis();
 
-		Collection<String> individuals;
-		if (germplasmDbIds != null) {
-			individuals = germplasmDbIds;
-		} else {
-			individuals = mongoTemplate.getCollection(mongoTemplate.getCollectionName(Individual.class))
-					.distinct("_id", String.class).into(new ArrayList<>());
-		}
+//		Collection<String> individuals;
+//		if (germplasmDbIds != null) {
+//			individuals = germplasmDbIds;
+//		} else {
+//			individuals = mongoTemplate.getCollection(mongoTemplate.getCollectionName(Individual.class))
+//					.distinct("_id", String.class).into(new ArrayList<>());
+//		}
 
 		ArrayList<Map<String, Object>> data = new ArrayList<>(); // we use this structure to keep them sorted
 
@@ -1268,9 +1267,7 @@ public class BrapiRestController implements ServletContextAware {
 
 		TreeSet<Integer> sortedMarkerprofileDbIDs = new TreeSet<>();
 		sortedMarkerprofileDbIDs.addAll(markerprofileDbIDs.stream().map(csId -> Integer.parseInt(csId)).toList());
-		Collection<CallSet> callsets = mongoTemplate.find(new Query(Criteria.where("_id").in(sortedMarkerprofileDbIDs)), CallSet.class);
-
-//        List<CallSet> callsets = MgdbDao.getCallSetsFromSamples(database, samples.stream().map(GenotypingSample::getId).collect(Collectors.toSet()));
+		List<CallSet> callsets = mongoTemplate.find(new Query(Criteria.where(GenotypingSample.FIELDNAME_CALLSETS + "._id").in(sortedMarkerprofileDbIDs)), GenotypingSample.class).stream().map(sp -> sp.getCallSets()).flatMap(Collection::stream).toList();
 
 		List<String> wantedMarkerIDs;
 		if (markerDbId != null)
