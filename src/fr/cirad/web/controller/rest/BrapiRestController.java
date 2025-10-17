@@ -1393,13 +1393,13 @@ public class BrapiRestController implements ServletContextAware {
 				Collection<VariantRunData> runs = variantsAndRuns.get(variants[i]);
 				if (runs != null) {
 					for (VariantRunData run : runs) {
-						for (Integer sampleId : run.getSampleGenotypes().keySet()) {
-							SampleGenotype sampleGenotype = run.getSampleGenotypes().get(sampleId);
+						for (Integer callSetId : run.getSampleGenotypes().keySet()) {
+							SampleGenotype sampleGenotype = run.getSampleGenotypes().get(callSetId);
 							String gtCode = sampleGenotype.getCode(); // we don't support exporting phasing information
 																		// because of complexity due to pagination
 							ArrayList<String> gtList = new ArrayList<String>();
 							gtList.add(variants[i].getId().toString());
-							gtList.add("" + sampleId);
+							gtList.add("" + callSetId);
 							if (gtCode == null || gtCode.length() == 0) {
 								gtList.add(unknownGtCode);
 							} else {
