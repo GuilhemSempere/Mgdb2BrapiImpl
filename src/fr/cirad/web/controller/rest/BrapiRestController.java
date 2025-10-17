@@ -84,6 +84,7 @@ import com.mongodb.client.MongoCursor;
 
 import fr.cirad.io.brapi.BrapiService;
 import fr.cirad.mgdb.exporting.IExportHandler;
+import fr.cirad.mgdb.model.mongo.subtypes.Callset;
 import fr.cirad.mgdb.model.mongo.subtypes.ReferencePosition;
 import fr.cirad.mgdb.model.mongo.subtypes.SampleGenotype;
 import fr.cirad.mgdb.model.mongo.subtypes.VariantRunDataId;
@@ -995,8 +996,8 @@ public class BrapiRestController implements ServletContextAware {
 				continue;
 			}
 
-            for (ArrayList<CallSet> callsets : MgdbDao.getCallsetsBySampleForProjects(database, Arrays.asList(gp.getId()), null).values())
-	            for (CallSet callSet : callsets) {
+            for (ArrayList<Callset> callsets : MgdbDao.getCallsetsBySampleForProjects(database, Arrays.asList(gp.getId()), null).values())
+	            for (Callset callSet : callsets) {
 	                Map<String, Object> markerProfile = new HashMap<>();
 	                markerProfile.put("markerprofileDbId", callSet.getId());
 	                markerProfile.put("uniqueDisplayName", callSet.getId());
@@ -1267,7 +1268,7 @@ public class BrapiRestController implements ServletContextAware {
 
 		TreeSet<Integer> sortedMarkerprofileDbIDs = new TreeSet<>();
 		sortedMarkerprofileDbIDs.addAll(markerprofileDbIDs.stream().map(csId -> Integer.parseInt(csId)).toList());
-		List<CallSet> callsets = mongoTemplate.find(new Query(Criteria.where(GenotypingSample.FIELDNAME_CALLSETS + "._id").in(sortedMarkerprofileDbIDs)), GenotypingSample.class).stream().map(sp -> sp.getCallSets()).flatMap(Collection::stream).toList();
+		List<Callset> callsets = mongoTemplate.find(new Query(Criteria.where(GenotypingSample.FIELDNAME_CALLSETS + "._id").in(sortedMarkerprofileDbIDs)), GenotypingSample.class).stream().map(sp -> sp.getCallSets()).flatMap(Collection::stream).toList();
 
 		List<String> wantedMarkerIDs;
 		if (markerDbId != null)
@@ -1313,7 +1314,7 @@ public class BrapiRestController implements ServletContextAware {
 								new File(outputLocation.getAbsolutePath() + File.separator + extractId + ".tsv"));
 						fw.write("markerprofileDbIds\t" + StringUtils.join(sortedMarkerprofileDbIDs, "\t"));
 
-						HashMap<CallSet, String> previousPhasingIds = new HashMap<>();
+						HashMap<Callset, String> previousPhasingIds = new HashMap<>();
 						while (nChunkIndex * nChunkSize < finalMarkerList.size()) {
 							progress.setCurrentStepProgress((nChunkIndex * nChunkSize) * 100 / finalMarkerList.size());
 
@@ -1327,7 +1328,7 @@ public class BrapiRestController implements ServletContextAware {
 									for (VariantRunData run : runs) {
 										VariantRunDataId variantRunDataId = run.getId();
 										fw.write(IExportHandler.LINE_SEPARATOR + variantRunDataId.getVariantId());
-										for (CallSet callSet : callsets) {
+										for (Callset callSet : callsets) {
 											SampleGenotype sampleGenotype = run.getSampleGenotypes().get(callSet.getId());
 											if (sampleGenotype == null) {
 												fw.write("\t");
