@@ -769,7 +769,7 @@ public class BrapiRestController implements ServletContextAware {
 
 		Authentication authentication = tokenManager.getAuthenticationFromToken(token);
 		HashMap<String, Object> result = new HashMap<>();
-		Individual ind = MgdbDao.getInstance().loadIndividualsWithAllMetadata(database, authentication == null ? "anonymousUser" : authentication.getName(), null, Arrays.asList(germplasmDbId), null).get(germplasmDbId);
+		Individual ind = MgdbDao.getInstance().loadIndividualsForUser(database, authentication == null ? "anonymousUser" : authentication.getName(), null, Arrays.asList(germplasmDbId), null).get(germplasmDbId);
 		if (ind == null) {
 			build404Response(response);
 			return null;
@@ -916,7 +916,7 @@ public class BrapiRestController implements ServletContextAware {
 
         Authentication auth = tokenManager.getAuthenticationFromToken(tokenManager.readToken(request));
         String sCurrentUser = auth == null || "anonymousUser".equals(auth.getName()) ? "anonymousUser" : auth.getName();
-        for (Individual ind : MgdbDao.getInstance().loadIndividualsWithAllMetadata(database, sCurrentUser, null, indIDsForCurrentPage, null).values()) {
+        for (Individual ind : MgdbDao.getInstance().loadIndividualsForUser(database, sCurrentUser, null, indIDsForCurrentPage, null).values()) {
             Map<String, Object> germplasm = new TreeMap<>();
             germplasm.put(BrapiService.BRAPI_FIELD_germplasmDbId, ind.getId());
             germplasm.put("germplasmName", ind.getId());
