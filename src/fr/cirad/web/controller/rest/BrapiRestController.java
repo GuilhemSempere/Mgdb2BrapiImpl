@@ -44,6 +44,7 @@ import javax.servlet.ServletContext;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import fr.cirad.mgdb.model.mongo.maintypes.*;
 import org.apache.commons.collections.map.UnmodifiableMap;
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.lang.exception.ExceptionUtils;
@@ -83,17 +84,11 @@ import com.mongodb.client.MongoCursor;
 
 import fr.cirad.io.brapi.BrapiService;
 import fr.cirad.mgdb.exporting.IExportHandler;
-import fr.cirad.mgdb.model.mongo.maintypes.Assembly;
-import fr.cirad.mgdb.model.mongo.maintypes.GenotypingProject;
-import fr.cirad.mgdb.model.mongo.maintypes.GenotypingSample;
-import fr.cirad.mgdb.model.mongo.maintypes.Individual;
-import fr.cirad.mgdb.model.mongo.maintypes.VariantData;
-import fr.cirad.mgdb.model.mongo.maintypes.VariantRunData;
+import fr.cirad.mgdb.model.mongo.subtypes.Callset;
 import fr.cirad.mgdb.model.mongo.subtypes.ReferencePosition;
 import fr.cirad.mgdb.model.mongo.subtypes.SampleGenotype;
 import fr.cirad.mgdb.model.mongo.subtypes.VariantRunDataId;
 import fr.cirad.mgdb.model.mongodao.MgdbDao;
-import fr.cirad.tools.AlphaNumericComparator;
 import fr.cirad.tools.AppConfig;
 import fr.cirad.tools.Helper;
 import fr.cirad.tools.ProgressIndicator;
@@ -428,7 +423,8 @@ public class BrapiRestController implements ServletContextAware {
 				+ (taxon != null && !taxon.equals(species) ? (species != null ? " ; " : "") + "Taxon: " + taxon : "");
 		resultObject.put("description",
 				"Database: " + database + " ; " + (!taxoDesc.isEmpty() ? taxoDesc + " ; " : "")
-						+ Helper.estimDocCount(mongoTemplate, Individual.class) + " germplasms ; "
+						+ Helper.estimDocCount(mongoTemplate, Individual.class) + " germplasm ; "
+						+ Helper.estimDocCount(mongoTemplate, GenotypingSample.class) + " samples ; "
 						+ Helper.estimDocCount(mongoTemplate, VariantData.class) + " markers");
 		resultObject.put("contact", "gigwa@cirad.fr");
 		return resultObject;
@@ -720,7 +716,7 @@ public class BrapiRestController implements ServletContextAware {
 
 		GenotypingProject gp = mongoTemplate.findById(studyDbId, GenotypingProject.class);
 		if (gp != null && tokenManager.canUserReadProject(tokenManager.readToken(request), database, gp.getId())) {
-			for (String individual : MgdbDao.getProjectIndividuals(database, gp.getId())) {
+			for (String individual : MgdbDao.getProjectIndividuals(database, Arrays.asList(gp.getId()))) {
 				Map<String, Object> germplasm = new HashMap<>();
 				germplasm.put(BrapiService.BRAPI_FIELD_germplasmDbId, individual);
 				germplasm.put("germplasmName", individual);
@@ -773,7 +769,7 @@ public class BrapiRestController implements ServletContextAware {
 
 		Authentication authentication = tokenManager.getAuthenticationFromToken(token);
 		HashMap<String, Object> result = new HashMap<>();
-		Individual ind = MgdbDao.getInstance().loadIndividualsWithAllMetadata(database, authentication == null ? "anonymousUser" : authentication.getName(), null, Arrays.asList(germplasmDbId), null).get(germplasmDbId);
+		Individual ind = MgdbDao.getInstance().loadIndividualsForUser(database, authentication == null ? "anonymousUser" : authentication.getName(), null, Arrays.asList(germplasmDbId), null).get(germplasmDbId);
 		if (ind == null) {
 			build404Response(response);
 			return null;
@@ -920,7 +916,7 @@ public class BrapiRestController implements ServletContextAware {
 
         Authentication auth = tokenManager.getAuthenticationFromToken(tokenManager.readToken(request));
         String sCurrentUser = auth == null || "anonymousUser".equals(auth.getName()) ? "anonymousUser" : auth.getName();
-        for (Individual ind : MgdbDao.getInstance().loadIndividualsWithAllMetadata(database, sCurrentUser, null, indIDsForCurrentPage, null).values()) {
+        for (Individual ind : MgdbDao.getInstance().loadIndividualsForUser(database, sCurrentUser, null, indIDsForCurrentPage, null).values()) {
             Map<String, Object> germplasm = new TreeMap<>();
             germplasm.put(BrapiService.BRAPI_FIELD_germplasmDbId, ind.getId());
             germplasm.put("germplasmName", ind.getId());
@@ -982,13 +978,13 @@ public class BrapiRestController implements ServletContextAware {
 //		LOG.debug("markerProfiles called");
 		long before = System.currentTimeMillis();
 
-		Collection<String> individuals;
-		if (germplasmDbIds != null) {
-			individuals = germplasmDbIds;
-		} else {
-			individuals = mongoTemplate.getCollection(mongoTemplate.getCollectionName(Individual.class))
-					.distinct("_id", String.class).into(new ArrayList<>());
-		}
+//		Collection<String> individuals;
+//		if (germplasmDbIds != null) {
+//			individuals = germplasmDbIds;
+//		} else {
+//			individuals = mongoTemplate.getCollection(mongoTemplate.getCollectionName(Individual.class))
+//					.distinct("_id", String.class).into(new ArrayList<>());
+//		}
 
 		ArrayList<Map<String, Object>> data = new ArrayList<>(); // we use this structure to keep them sorted
 
@@ -1000,23 +996,22 @@ public class BrapiRestController implements ServletContextAware {
 				continue;
 			}
 
-            Collection<GenotypingSample> samplesForProject = MgdbDao.getInstance().loadSamplesWithAllMetadata(database, AbstractTokenManager.getUserNameFromAuthentication(tokenManager.getAuthenticationFromToken(tokenManager.readToken(request))), null, MgdbDao.getSamplesForProject(database, gp.getId(), individuals).stream().map(sp -> sp.getId()).collect(Collectors.toList())).values();
-            for (GenotypingSample sample : samplesForProject) {
-                Map<String, Object> markerProfile = new HashMap<>();
-                String germplasmId = sample.getIndividual();
-                markerProfile.put("markerprofileDbId", sample.getId().toString());
-                markerProfile.put("uniqueDisplayName", sample.getId().toString());
-                markerProfile.put(BrapiService.BRAPI_FIELD_germplasmDbId, germplasmId);
-                markerProfile.put("sampleDbId", "" + sample.getId());
-                markerProfile.put("analysisMethod", gp.getTechnology());
-                markerProfile.put("extractDbId", "");
-//				long resultCount = mongoTemplate.count(new Query(new Criteria().andOperator(
-//						Criteria.where("_id." + VariantRunDataId.FIELDNAME_PROJECT_ID).is(gp.getId()),
-//						Criteria.where(VariantRunData.FIELDNAME_SAMPLEGENOTYPES + "." + sample.getId() + "." + SampleGenotype.FIELDNAME_GENOTYPECODE).exists(true))
-//					), VariantRunData.class);
-//				markerProfile.put("resultCount", resultCount); // takes too much time to respond on big databases
-				data.add(markerProfile);
-			}
+            for (ArrayList<Callset> callsets : MgdbDao.getCallsetsBySampleForProjects(database, Arrays.asList(gp.getId()), null).values())
+	            for (Callset callSet : callsets) {
+	                Map<String, Object> markerProfile = new HashMap<>();
+	                markerProfile.put("markerprofileDbId", callSet.getId());
+	                markerProfile.put("uniqueDisplayName", callSet.getId());
+	                markerProfile.put(BrapiService.BRAPI_FIELD_germplasmDbId, callSet.getIndividual());
+	                markerProfile.put("sampleDbId", "" + callSet.getSampleId());
+	                markerProfile.put("analysisMethod", gp.getTechnology());
+	                markerProfile.put("extractDbId", "");
+	//				long resultCount = mongoTemplate.count(new Query(new Criteria().andOperator(
+	//						Criteria.where("_id." + VariantRunDataId.FIELDNAME_PROJECT_ID).is(gp.getId()),
+	//						Criteria.where(VariantRunData.FIELDNAME_SAMPLEGENOTYPES + "." + sample.getId() + "." + SampleGenotype.FIELDNAME_GENOTYPECODE).exists(true))
+	//					), VariantRunData.class);
+	//				markerProfile.put("resultCount", resultCount); // takes too much time to respond on big databases
+					data.add(markerProfile);
+				}
 		}
 
 		Map<String, Object> resultObject = getStandardResponse(data.size(), 0, data.size(), data.size(), true);
@@ -1271,11 +1266,9 @@ public class BrapiRestController implements ServletContextAware {
 		ArrayList<ArrayList<String>> data = new ArrayList<>();
 		Map<String, Object> resultObject;
 
-		TreeSet<String> sortedMarkerprofileDbIDs = new TreeSet<String>(new AlphaNumericComparator<String>());
-		sortedMarkerprofileDbIDs.addAll(markerprofileDbIDs);
-		Collection<GenotypingSample> samples = mongoTemplate.find(new Query(Criteria.where("_id")
-				.in(sortedMarkerprofileDbIDs.stream().map(id -> Integer.parseInt(id)).collect(Collectors.toList()))),
-				GenotypingSample.class);
+		TreeSet<Integer> sortedMarkerprofileDbIDs = new TreeSet<>();
+		sortedMarkerprofileDbIDs.addAll(markerprofileDbIDs.stream().map(csId -> Integer.parseInt(csId)).toList());
+		List<Callset> callsets = mongoTemplate.find(new Query(Criteria.where(GenotypingSample.FIELDNAME_CALLSETS + "._id").in(sortedMarkerprofileDbIDs)), GenotypingSample.class).stream().map(sp -> sp.getCallSets()).flatMap(Collection::stream).toList();
 
 		List<String> wantedMarkerIDs;
 		if (markerDbId != null)
@@ -1321,12 +1314,12 @@ public class BrapiRestController implements ServletContextAware {
 								new File(outputLocation.getAbsolutePath() + File.separator + extractId + ".tsv"));
 						fw.write("markerprofileDbIds\t" + StringUtils.join(sortedMarkerprofileDbIDs, "\t"));
 
-						HashMap<GenotypingSample, String> previousPhasingIds = new HashMap<>();
+						HashMap<Callset, String> previousPhasingIds = new HashMap<>();
 						while (nChunkIndex * nChunkSize < finalMarkerList.size()) {
 							progress.setCurrentStepProgress((nChunkIndex * nChunkSize) * 100 / finalMarkerList.size());
 
 							List<String> markerSubList = finalMarkerList.subList(nChunkIndex * nChunkSize, Math.min(finalMarkerList.size(), ++nChunkIndex * nChunkSize));
-							LinkedHashMap<VariantData, Collection<VariantRunData>> variantsAndRuns = MgdbDao.getSampleGenotypes(mongoTemplate, samples, markerSubList, true, null/* new Sort(Sort.Direction.DESC, "_id") */);
+							LinkedHashMap<VariantData, Collection<VariantRunData>> variantsAndRuns = MgdbDao.getCallSetGenotypes(mongoTemplate, callsets, markerSubList, true, null/* new Sort(Sort.Direction.DESC, "_id") */);
 							VariantData[] variants = variantsAndRuns.keySet()
 									.toArray(new VariantData[variantsAndRuns.size()]);
 							for (int i = 0; i < variantsAndRuns.size(); i++) {
@@ -1335,34 +1328,26 @@ public class BrapiRestController implements ServletContextAware {
 									for (VariantRunData run : runs) {
 										VariantRunDataId variantRunDataId = run.getId();
 										fw.write(IExportHandler.LINE_SEPARATOR + variantRunDataId.getVariantId());
-										for (GenotypingSample sample : samples) {
-											SampleGenotype sampleGenotype = run.getSampleGenotypes()
-													.get(sample.getId());
+										for (Callset callSet : callsets) {
+											SampleGenotype sampleGenotype = run.getSampleGenotypes().get(callSet.getId());
 											if (sampleGenotype == null) {
 												fw.write("\t");
-												continue; // no data in this run + marker for that sample
+												continue; // no data in this run + marker for that callset
 											}
 
-											String currentPhId = (String) sampleGenotype.getAdditionalInfo()
-													.get(VariantData.GT_FIELD_PHASED_ID);
-											boolean fPhased = currentPhId != null
-													&& currentPhId.equals(previousPhasingIds.get(sample));
-											previousPhasingIds.put(sample,
-													currentPhId == null ? variantRunDataId.getVariantId()
-															: currentPhId);
+											String currentPhId = (String) sampleGenotype.getAdditionalInfo() .get(VariantData.GT_FIELD_PHASED_ID);
+											boolean fPhased = currentPhId != null && currentPhId.equals(previousPhasingIds.get(callSet));
+											previousPhasingIds.put(callSet, currentPhId == null ? variantRunDataId.getVariantId() : currentPhId);
 
 											String gtCode = sampleGenotype.getCode();
-											if (gtCode == null || gtCode.length() == 0) {
+											if (gtCode == null || gtCode.length() == 0)
 												fw.write("\t" + unknownGtCode);
-											} else {
+											else {
 												List<String> alleles = variants[i].getAllelesFromGenotypeCode(gtCode);
-												if (!Boolean.TRUE.equals(expandHomozygotes)
-														&& new HashSet<String>(alleles).size() == 1) {
+												if (!Boolean.TRUE.equals(expandHomozygotes) && new HashSet<String>(alleles).size() == 1)
 													fw.write("\t" + alleles.get(0));
-												} else {
-													fw.write("\t" + StringUtils.join(alleles,
-															fPhased ? phasedSeparator : unPhasedSeparator));
-												}
+												else
+													fw.write("\t" + StringUtils.join(alleles, fPhased ? phasedSeparator : unPhasedSeparator));
 											}
 										}
 									}
@@ -1403,25 +1388,19 @@ public class BrapiRestController implements ServletContextAware {
 			wantedMarkerIDs = wantedMarkerIDs.subList(page * numberOfMarkersToReturn,
 					Math.min(wantedMarkerIDs.size(), (page + 1) * numberOfMarkersToReturn));
 
-			LinkedHashMap<VariantData, Collection<VariantRunData>> variantsAndRuns = MgdbDao.getSampleGenotypes(
-					mongoTemplate, samples, wantedMarkerIDs, true, null/* new Sort(Sort.Direction.DESC, "_id") */); // query
-																													// mongo
-																													// db
-																													// for
-																													// matching
-																													// genotypes
+			LinkedHashMap<VariantData, Collection<VariantRunData>> variantsAndRuns = MgdbDao.getCallSetGenotypes(mongoTemplate, callsets, wantedMarkerIDs, true, null/* new Sort(Sort.Direction.DESC, "_id") */); // query mongodb for matching genotypes
 			VariantData[] variants = variantsAndRuns.keySet().toArray(new VariantData[variantsAndRuns.size()]);
 			for (int i = 0; i < variantsAndRuns.size(); i++) {
 				Collection<VariantRunData> runs = variantsAndRuns.get(variants[i]);
 				if (runs != null) {
 					for (VariantRunData run : runs) {
-						for (Integer sampleId : run.getSampleGenotypes().keySet()) {
-							SampleGenotype sampleGenotype = run.getSampleGenotypes().get(sampleId);
+						for (Integer callSetId : run.getSampleGenotypes().keySet()) {
+							SampleGenotype sampleGenotype = run.getSampleGenotypes().get(callSetId);
 							String gtCode = sampleGenotype.getCode(); // we don't support exporting phasing information
 																		// because of complexity due to pagination
 							ArrayList<String> gtList = new ArrayList<String>();
 							gtList.add(variants[i].getId().toString());
-							gtList.add("" + sampleId);
+							gtList.add("" + callSetId);
 							if (gtCode == null || gtCode.length() == 0) {
 								gtList.add(unknownGtCode);
 							} else {
