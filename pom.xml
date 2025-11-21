@@ -98,11 +98,6 @@
             <version>4.0.1</version>
             <scope>provided</scope>
         </dependency>
-<!--        <dependency>-->
-<!--        	<groupId>org.snpeff</groupId>-->
-<!--        	<artifactId>SnpEff</artifactId>-->
-<!--        	<version>5.2</version>-->
-<!--        </dependency>-->
   </dependencies>
   <repositories>
 	  <repository>
