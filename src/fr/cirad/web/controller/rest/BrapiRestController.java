@@ -140,8 +140,7 @@ public class BrapiRestController implements ServletContextAware {
 	/**
 	 * The Constant EXPORT_FILE_EXPIRATION_DELAY_MILLIS.
 	 */
-	static final private long EXPORT_FILE_EXPIRATION_DELAY_MILLIS = 1000 * 60 * 60 * 24;
-	/* 1 day */
+	static final private long EXPORT_FILE_EXPIRATION_DELAY_MILLIS = 1000 * 60 * 60 * 24; /* 1 day */
 
 	static public final String URL_BASE_PREFIX = "/brapi/v1";
 
@@ -1189,17 +1188,10 @@ public class BrapiRestController implements ServletContextAware {
 
 	/**
 	 * Cleanup old export data.
-	 *
-	 * @param request the request
-	 * @throws Exception
 	 */
-	private void cleanupOldExportData(HttpServletRequest request) throws Exception {
-		if (request.getSession() == null) {
-			throw new Exception("Invalid request object");
-		}
-
+	static public void cleanupOldExportData(ServletContext sc) {
 		long nowMillis = new Date().getTime();
-		File filterOutputLocation = new File(servletContext.getRealPath(File.separator + TMP_OUTPUT_FOLDER));
+		File filterOutputLocation = new File(sc.getRealPath(File.separator + TMP_OUTPUT_FOLDER));
 		if (filterOutputLocation.exists() && filterOutputLocation.isDirectory()) {
 			for (File f : filterOutputLocation.listFiles()) {
 				if (!f.isDirectory() && nowMillis - f.lastModified() > EXPORT_FILE_EXPIRATION_DELAY_MILLIS) {
@@ -1370,7 +1362,7 @@ public class BrapiRestController implements ServletContextAware {
 				}
 			}.start();
 
-			cleanupOldExportData(request);
+			cleanupOldExportData(request.getServletContext());
 		} else {
 			final int MAX_SUPPORTED_MATRIX_SIZE = 30000;
 
